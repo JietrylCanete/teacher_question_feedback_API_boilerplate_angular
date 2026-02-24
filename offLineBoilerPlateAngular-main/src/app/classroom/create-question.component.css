@@ -1,0 +1,143 @@
+.create-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  display: inline-block;
+  transition: all 0.2s;
+}
+
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
+
+.create-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.form-label {
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+.form-control {
+  border: 2px solid #e9ecef;
+  border-radius: 16px;
+  padding: 1rem;
+  font-size: 1rem;
+  resize: vertical;
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15);
+}
+
+.form-control.is-invalid {
+  border-color: #dc3545;
+}
+
+.counter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.text-success {
+  color: #198754 !important;
+}
+
+.text-danger {
+  color: #dc3545 !important;
+}
+
+.error-messages {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f8d7da;
+  border-radius: 12px;
+  color: #842029;
+  font-size: 0.9rem;
+}
+
+.tips-card {
+  background: linear-gradient(135deg, #fff3cd 0%, #fff8e7 100%);
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid #ffe69c;
+}
+
+.tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tips-list li {
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  color: #664d03;
+}
+
+.tips-list li:last-child {
+  margin-bottom: 0;
+}
+
+.btn-primary {
+  background: #0d6efd;
+  border: none;
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0b5ed7;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(13,110,253,0.3);
+}
+
+.btn-outline-secondary {
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #6c757d;
+  color: #6c757d;
+  transition: all 0.2s;
+}
+
+.btn-outline-secondary:hover {
+  background: #6c757d;
+  color: white;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .create-container {
+    padding: 1rem;
+  }
+
+  .create-card {
+    padding: 1.5rem;
+  }
+
+  .display-6 {
+    font-size: 1.5rem;
+  }
+}

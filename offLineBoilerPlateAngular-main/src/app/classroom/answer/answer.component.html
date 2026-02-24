@@ -1,0 +1,180 @@
+<div class="answer-container">
+  <!-- Back Button -->
+  <div class="mb-4">
+    <a routerLink="/classroom" class="back-link">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to Questions
+    </a>
+  </div>
+
+  <div class="row">
+    <!-- Left Column - Question View -->
+    <div class="col-lg-5 mb-4">
+      <div class="question-card">
+        <div class="question-header">
+          <span class="badge bg-primary">
+            <i class="bi bi-question-circle me-1"></i>
+            Question
+          </span>
+          <small class="text-secondary">
+            <i class="bi bi-clock me-1"></i>
+            {{ question?.createdAt | date:'medium' }}
+          </small>
+        </div>
+
+        <div class="question-content">
+          <h5 class="mb-3">What would you like to answer?</h5>
+          <div class="question-text">
+            <p class="mb-0">{{ question?.questionText || 'Loading question...' }}</p>
+          </div>
+        </div>
+
+        <div class="question-footer">
+          <i class="bi bi-person-circle text-primary me-2"></i>
+          <span class="text-secondary">Teacher</span>
+        </div>
+      </div>
+
+      <!-- Tips Card -->
+      <div class="tips-card mt-4">
+        <h6 class="mb-3">
+          <i class="bi bi-lightbulb text-warning me-2"></i>
+          Answering Tips
+        </h6>
+        <ul class="tips-list mb-0">
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Read the question carefully
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Provide specific examples
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Be clear and concise
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Check your answer before submitting
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right Column - Answer Form -->
+    <div class="col-lg-7">
+      <div class="answer-card">
+        <div class="answer-header">
+          <h4 class="mb-0">
+            <i class="bi bi-pencil-square text-primary me-2"></i>
+            Your Answer
+          </h4>
+        </div>
+
+        <div class="answer-body">
+          <form [formGroup]="form" (ngSubmit)="submit()">
+            <!-- Answer Text Area -->
+            <div class="mb-4">
+              <textarea
+                class="form-control"
+                [ngClass]="{
+                  'is-invalid': submitted && f.answerText.errors,
+                  'border-primary': form.get('answerText')?.value && !submitted
+                }"
+                rows="8"
+                formControlName="answerText"
+                placeholder="Type your answer here... Be specific and detailed...">
+              </textarea>
+
+              <!-- Character Counter -->
+              <div class="counter mt-2">
+                <small class="text-secondary">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Minimum 10 characters
+                </small>
+                <small [class.text-danger]="(form.get('answerText')?.value?.length || 0) > 400"
+                       [class.text-success]="(form.get('answerText')?.value?.length || 0) <= 400">
+                  {{ form.get('answerText')?.value?.length || 0 }}/500
+                </small>
+              </div>
+
+              <!-- Validation Errors -->
+              <div *ngIf="submitted && f.answerText.errors" class="error-messages">
+                <div *ngIf="f.answerText.errors.required">
+                  <i class="bi bi-exclamation-circle me-1"></i>
+                  Answer is required
+                </div>
+                <div *ngIf="f.answerText.errors.minlength">
+                  <i class="bi bi-exclamation-circle me-1"></i>
+                  Answer must be at least 10 characters
+                </div>
+                <div *ngIf="f.answerText.errors.maxlength">
+                  <i class="bi bi-exclamation-circle me-1"></i>
+                  Answer cannot exceed 500 characters
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-3">
+              <button type="submit" 
+                      [disabled]="submitting" 
+                      class="btn btn-primary flex-grow-1">
+                <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2"></span>
+                <i *ngIf="!submitting" class="bi bi-send me-2"></i>
+                {{ submitting ? 'Submitting...' : 'Submit Answer' }}
+              </button>
+              
+              <button type="button" 
+                      class="btn btn-outline-secondary"
+                      (click)="resetForm()">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+            </div>
+          </form>
+
+          <!-- AI Feedback -->
+          <div *ngIf="feedback" class="feedback-section mt-4">
+            <div class="feedback-card"
+                 [ngClass]="{
+                   'feedback-success': feedback.isRelevant === true,
+                   'feedback-warning': feedback.isRelevant === false,
+                   'feedback-info': feedback.isRelevant === null
+                 }">
+              
+              <div class="d-flex align-items-start">
+                <div class="feedback-icon me-3">
+                  <i class="bi fs-2"
+                     [ngClass]="{
+                       'bi-check-circle-fill': feedback.isRelevant === true,
+                       'bi-exclamation-triangle-fill': feedback.isRelevant === false,
+                       'bi-robot': feedback.isRelevant === null
+                     }"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <h6 class="mb-2">
+                    {{
+                      feedback.isRelevant === true ? 'Great Answer!' :
+                      feedback.isRelevant === false ? 'Needs Improvement' :
+                      'AI Review'
+                    }}
+                  </h6>
+                  <p class="mb-0">{{ feedback.feedback }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="!question" class="text-center py-5">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <p class="mt-3 text-secondary">Loading question...</p>
+</div>

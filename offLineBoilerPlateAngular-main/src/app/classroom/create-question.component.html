@@ -1,0 +1,105 @@
+<div class="create-container">
+  <!-- Header -->
+  <div class="d-flex align-items-center mb-4">
+    <a routerLink="/classroom" class="back-link">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to Questions
+    </a>
+    <h1 class="display-6 fw-bold text-primary ms-3 mb-0">
+      <i class="bi bi-plus-circle me-2"></i>Create Question
+    </h1>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="create-card">
+        <form [formGroup]="form" (ngSubmit)="onSubmit()">
+          <!-- Question Input -->
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-question-circle text-primary me-2"></i>
+              Question
+            </label>
+            <textarea
+              class="form-control"
+              rows="5"
+              formControlName="questionText"
+              placeholder="Enter your question here... Be clear and specific..."
+              [ngClass]="{ 'is-invalid': submitted && f.questionText.errors }">
+            </textarea>
+
+            <!-- Character Counter -->
+            <div class="counter mt-2">
+              <small class="text-secondary">
+                <i class="bi bi-info-circle me-1"></i>
+                Minimum 10 characters
+              </small>
+              <small [class.text-danger]="(form.get('questionText')?.value?.length || 0) > 500"
+                     [class.text-success]="(form.get('questionText')?.value?.length || 0) <= 500">
+                {{ form.get('questionText')?.value?.length || 0 }}/500
+              </small>
+            </div>
+
+            <!-- Validation Errors -->
+            <div *ngIf="submitted && f.questionText.errors" class="error-messages">
+              <div *ngIf="f.questionText.errors.required">
+                <i class="bi bi-exclamation-circle me-1"></i>
+                Question is required
+              </div>
+              <div *ngIf="f.questionText.errors.minlength">
+                <i class="bi bi-exclamation-circle me-1"></i>
+                Question must be at least 10 characters
+              </div>
+              <div *ngIf="f.questionText.errors.maxlength">
+                <i class="bi bi-exclamation-circle me-1"></i>
+                Question cannot exceed 500 characters
+              </div>
+            </div>
+          </div>
+
+          <!-- Tips Section -->
+          <div class="tips-card mb-4">
+            <h6 class="mb-3">
+              <i class="bi bi-lightbulb text-warning me-2"></i>
+              Tips for creating good questions
+            </h6>
+            <ul class="tips-list mb-0">
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Be clear and specific
+              </li>
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Provide context if needed
+              </li>
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Avoid ambiguous language
+              </li>
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Break complex questions into parts
+              </li>
+            </ul>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="d-flex gap-3">
+            <button type="submit" 
+                    [disabled]="submitting" 
+                    class="btn btn-primary flex-grow-1">
+              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2"></span>
+              <i *ngIf="!submitting" class="bi bi-send me-2"></i>
+              {{ submitting ? 'Creating...' : 'Create Question' }}
+            </button>
+            
+            <a routerLink="/classroom" class="btn btn-outline-secondary">
+              <i class="bi bi-x-circle me-2"></i>
+              Cancel
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

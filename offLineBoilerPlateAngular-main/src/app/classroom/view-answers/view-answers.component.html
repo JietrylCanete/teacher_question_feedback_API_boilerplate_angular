@@ -1,0 +1,121 @@
+<div class="view-answers-container">
+  <!-- Header with Back Button -->
+  <div class="mb-4">
+    <button class="back-link" (click)="goBack()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to Questions
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-secondary">Loading answers...</p>
+  </div>
+
+  <div *ngIf="!loading">
+    <!-- Question Card -->
+    <div class="question-card mb-4">
+      <div class="question-header">
+        <span class="badge bg-primary">
+          <i class="bi bi-question-circle me-1"></i>
+          Question
+        </span>
+        <small class="text-secondary">
+          <i class="bi bi-clock me-1"></i>
+          {{ question?.createdAt | date:'medium' }}
+        </small>
+      </div>
+
+      <div class="question-content">
+        <h5 class="mb-3">Question Details:</h5>
+        <div class="question-text">
+          <p class="mb-0">{{ question?.questionText || 'Loading question...' }}</p>
+        </div>
+      </div>
+
+      <div class="question-footer">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-person-circle text-primary me-2"></i>
+          <span class="text-secondary">Teacher</span>
+        </div>
+        <div class="answer-count">
+          <i class="bi bi-chat-dots me-1"></i>
+          {{ answers.length }} {{ answers.length === 1 ? 'Answer' : 'Answers' }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Answers Section -->
+    <div class="answers-section">
+      <h3 class="h4 mb-4">
+        <i class="bi bi-chat-dots-fill text-primary me-2"></i>
+        Student Answers
+      </h3>
+
+      <!-- No Answers State -->
+      <div *ngIf="answers.length === 0" class="no-answers text-center py-5">
+        <div class="empty-state mb-4">
+          <i class="bi bi-chat" style="font-size: 4rem; color: #dee2e6;"></i>
+        </div>
+        <h4 class="h5 text-secondary mb-3">No Answers Yet</h4>
+        <p class="text-secondary mb-0">Students haven't answered this question yet.</p>
+      </div>
+
+      <!-- Answers List -->
+      <div *ngIf="answers.length > 0" class="answers-list">
+        <div *ngFor="let answer of answers; let i = index" class="answer-item">
+          <div class="answer-card">
+            <!-- Answer Header -->
+            <div class="answer-header">
+              <div class="d-flex align-items-center">
+                <div class="student-avatar me-3">
+                  <i class="bi bi-person-circle fs-3"></i>
+                </div>
+                <div>
+                  <h6 class="mb-1">Student {{ answer.studentId || 'Anonymous' }}</h6>
+                  <small class="text-secondary">
+                    <i class="bi bi-clock me-1"></i>
+                    {{ answer.submittedAt | date:'medium' }}
+                  </small>
+                </div>
+              </div>
+              <span class="relevance-badge" 
+                    [ngClass]="getRelevanceClass(answer.aiReview?.isRelevant)">
+                <i [class]="'bi me-1 ' + getRelevanceIcon(answer.aiReview?.isRelevant)"></i>
+                {{ getRelevanceBadge(answer.aiReview?.isRelevant) }}
+              </span>
+            </div>
+
+            <!-- Answer Content -->
+            <div class="answer-content">
+              <p class="mb-0">{{ answer.answerText }}</p>
+            </div>
+
+            <!-- AI Feedback -->
+            <div *ngIf="answer.aiReview" class="ai-feedback"
+                 [ngClass]="getRelevanceClass(answer.aiReview.isRelevant)">
+              <div class="d-flex">
+                <i class="bi bi-robot me-2 fs-5"></i>
+                <div>
+                  <strong>AI Feedback:</strong>
+                  <p class="mb-0 mt-1">{{ answer.aiReview.feedback }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Answer Meta -->
+            <div class="answer-meta">
+              <small class="text-secondary">
+                <i class="bi bi-bar-chart me-1"></i>
+                Answer #{{ i + 1 }}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

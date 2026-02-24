@@ -1,0 +1,77 @@
+.classroom-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.info-banner {
+  background: #e7f1ff;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  color: #084298;
+  border-left: 4px solid #0d6efd;
+}
+
+.card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(13,110,253,0.15);
+  border-color: rgba(13,110,253,0.2);
+}
+
+.question-content {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.question-content::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to bottom, transparent, white);
+}
+
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.btn-outline-primary, .btn-outline-info {
+  border-width: 2px;
+  border-radius: 12px;
+  padding: 12px;
+  font-weight: 500;
+}
+
+.btn-outline-primary:hover, .btn-outline-info:hover {
+  transform: scale(1.02);
+}
+
+.empty-state-icon {
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .classroom-container {
+    padding: 1rem;
+  }
+  
+  .display-6 {
+    font-size: 1.75rem;
+  }
+  
+  .info-banner {
+    font-size: 0.9rem;
+  }
+}

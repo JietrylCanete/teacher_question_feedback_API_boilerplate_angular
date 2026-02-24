@@ -1,0 +1,2217 @@
+
+================================================================================
+File: accounts\account.controller.js
+Size: 10.11 kB
+================================================================================
+
+const express = require('express');
+const router = express. Router(); 
+const Joi = require('joi');
+const validateRequest = require('_middleware/validate-request'); 
+const authorize = require('_middleware/authorize');
+const Role = require('_helpers/role');
+const accountService = require('./account.service');
+
+router.post('/authenticate', authenticateSchema, authenticate);
+router.post('/refresh-token', refreshToken);
+router.post('/revoke-token', authorize(), revokeTokenSchema, revokeToken); 
+router.post('/register', registerSchema, register);
+router.post('/verify-email', verifyEmailSchema, verifyEmail);
+router.post('/forgot-password', forgotPasswordSchema, forgotPassword);
+router.post('/validate-reset-token', validateResetTokenSchema, validateResetToken);
+router.post('/reset-password', resetPasswordSchema, resetPassword);
+
+router.get('/:preferenceId/preferences',authorize(), getPreferences);
+router.put('/:preferenceId/preferences',authorize(), updatePreferences);
+
+router.get('/', authorize (Role. Admin), getAll);
+router.post('/:AccountId/activity', authorize(), getActivities);
+router.get('/activity-logs', authorize(Role.Admin), getAllActivityLogs);
+router.get('/:AccountId', authorize(), getById);
+router.post('/', authorize (Role. Admin), createSchema, create);
+router.put('/:AccountId', authorize(), updateSchema, update);
+router.delete('/:AccountId', authorize(), _delete);
+
+module.exports = router;
+
+function authenticateSchema(req, res, next) { 
+    const schema = Joi.object({
+        email: Joi.string().required(),
+        password: Joi.string().required()
+    });
+
+    validateRequest(req, next, schema);
+}
+
+function authenticate(req, res, next) {
+    const { email, password } = req.body;
+    const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const browserInfo = req.headers['user-agent'] || 'Unknown Browser';
+  
+    accountService.authenticate({ email, password, ipAddress, browserInfo })
+      .then(({ refreshToken, ...account }) => {
+        setTokenCookie(res, refreshToken);
+        res.json(account);
+      })
+      .catch(next);
+  }
+//===================Logging Function=======================================
+function getActivities(req, res, next) {
+    const filters = {
+        actionType: req.query.actionType,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate
+    };
+    accountService.getAccountActivities(req.params.id, filters)
+        .then(activities => res.json(activities))
+        .catch(next);
+}
+function getAllActivityLogs(req, res, next) {
+    const filters = {
+        actionType: req.query.actionType,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        userId: req.query.userId
+    };
+    
+    accountService.getAllActivityLogs(filters)
+        .then(logs => res.json({
+            success: true,
+            data: logs
+        }))
+        .catch(next);
+}
+//====================Preferences Router Function=========================
+function getPreferences(req, res, next) {
+    accountService.getPreferences(req.params.id)
+        .then(preferences => res.json(preferences))
+        .catch(next);
+}
+function updatePreferences(req, res, next) {
+    accountService.updatePreferences(req.params.id, req.body)
+        .then(() => res.json({ message: 'Preferences updated successfully' }))
+        .catch(next);
+}
+function refreshToken (req, res, next) {
+    const token = req.cookies.refreshToken;
+    const ipAddress = req.ip;
+    accountService.refreshToken({ token, ipAddress })
+        .then(({refreshToken, ...account }) => {
+            setTokenCookie(res, refreshToken);
+            res.json(account);
+        })
+        .catch(next);
+}
+function revokeTokenSchema(req, res, next) { 
+    const schema = Joi.object({
+        token: Joi.string().empty('')
+    });
+    validateRequest(req, next, schema);
+}
+function revokeToken (req, res, next) {
+    const token = req.body.token || req.cookies.refreshToken; 
+    const ipAddress = req.ip;
+
+    if (!token) return res.status(400).json({ message: 'Token is required' });
+    
+    if (!req.user.ownsToken (token) && req.user.role !== Role. Admin) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    accountService.revokeToken({token, ipAddress })
+        .then(() =>res.json({ message: 'Token revoked' }))
+        .catch(next);
+}
+function registerSchema(req, res, next) {
+    const schema = Joi.object({
+        title: Joi.string().required(),
+        firstName: Joi.string().required(), 
+        lastName: Joi.string().required(),
+        email: Joi.string().email().required(),
+        password: Joi.string().min(6).required(),
+        confirmPassword: Joi.string().valid(Joi.ref('password')).required(), 
+        acceptTerms: Joi.boolean().valid(true).required()
+    });
+    validateRequest(req, next, schema);
+}
+function register(req, res, next) {
+    accountService.register(req.body, req.get('origin'))
+        .then(() => res.json({ message: 'Registration successful, please check your email for verification instructions' })) 
+        .catch(next);
+}
+function verifyEmailSchema(req, res, next) {
+    const schema = Joi.object({
+        token: Joi.string().required()
+    });
+    validateRequest(req, next, schema);
+}
+function verifyEmail(req, res, next) {
+    accountService.verifyEmail(req.body)
+        .then(() => res.json({ message: 'Verification successful, you can now login' })) 
+        .catch(next);
+}
+function forgotPasswordSchema(req, res, next) {
+    const schema = Joi.object({
+        email: Joi.string().email().required()
+    });
+    validateRequest(req, next, schema);
+}
+function forgotPassword(req, res, next) {
+    accountService.forgotPassword(req.body, req.get('origin'))
+        .then(() => res.json({ message: 'Please check your email for password reset instructions' })) 
+        .catch(next);
+}
+function validateResetTokenSchema(req, res, next) {
+    const schema = Joi.object({
+        token: Joi.string().required()
+    });
+    validateRequest(req, next, schema);
+}
+function validateResetToken(req, res, next) {
+    accountService.validateResetToken(req.body)
+        .then(() => res.json({ message: 'Token is valid' }))
+        .catch(next);
+}
+function resetPasswordSchema(req, res, next) {
+    const schema = Joi.object({
+        token: Joi.string().required(),
+        password: Joi.string().min(6).required(),
+        confirmPassword: Joi.string().valid(Joi.ref('password')).required()
+    });
+    validateRequest(req, next, schema);
+}
+function resetPassword(req, res, next) {
+    const { token, password } = req.body;
+    const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const browserInfo = req.headers['user-agent'] || 'Unknown Browser';
+  
+    accountService.resetPassword({ token, password }, ipAddress, browserInfo)
+      .then(() => {
+        res.json({ message: 'Password reset successful, you can now login' });
+      })
+      .catch(next);
+  }
+function getAll(req, res, next) {
+    accountService.getAll()
+        .then (accounts => res.json (accounts))
+        .catch(next);
+}
+function getById(req, res, next) {
+    // Check if the user is trying to access their own account or is an admin
+    if (Number(req.params.AccountId) !== req.user.AccountId && req.user.role !== Role.Admin) {
+        return res.status(403).json({ message: 'Access to other user\'s data is forbidden' });
+    }
+    
+    accountService.getById(req.params.AccountId)
+        .then(account => account ? res.json(account) : res.sendStatus(404)) 
+        .catch(next);
+}
+function createSchema (req, res, next) {
+    const schema = Joi.object({
+        title: Joi.string().required(), 
+        firstName: Joi.string().required(), 
+        lastName: Joi.string().required(), 
+        email: Joi.string().email().required(),
+        password: Joi.string().min(6).required(), 
+        confirmPassword: Joi.string().valid(Joi.ref('password')).required(),
+        role: Joi.string().valid(Role. Admin, Role.User, Role.Staff).required()
+    });
+    validateRequest(req, next, schema);
+}
+function create(req, res, next) {
+    accountService.create(req.body) 
+    .then (account => res.json (account)) 
+    .catch(next);
+}
+function updateSchema(req, res, next) { const schemaRules = {
+    title: Joi.string().empty(''), 
+    firstName: Joi.string().empty(''), 
+    lastName: Joi.string().empty(''),
+    email: Joi.string().email().empty(''),
+    password: Joi.string().min(6).empty(''),
+    confirmPassword: Joi.string().valid(Joi.ref('password')).empty('')
+}
+
+if (req.user.role === Role. Admin) {
+    schemaRules.role = Joi.string().valid (Role. Admin, Role.User, Role.Staff).empty('');
+}
+
+    const schema = Joi.object(schemaRules).with('password', 'confirmPassword'); 
+    validateRequest(req, next, schema);
+}
+function update(req, res, next) {
+    // Check authorization
+    if (Number(req.params.AccountId) !== req.user.AccountId && req.user.role !== Role.Admin) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized - You can only update your own account unless you are an admin'
+      });
+    }
+  
+    const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const browserInfo = req.headers['user-agent'] || 'Unknown Browser';
+  
+    accountService.update(req.params.AccountId, req.body, ipAddress, browserInfo)
+      .then(account => {
+        res.json({
+          success: true,
+          message: 'Account updated successfully',
+          account: account
+        });
+      })
+      .catch(next);
+  }
+function _delete(req, res, next) {
+    if (Number(req.params.AccountId) !== req.user.AccountId && req.user.role !== Role.Admin) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    accountService.delete(req.params.AccountId)
+        .then(() =>res.json({ message: 'Account deleted successfully' })) 
+        .catch(next);
+}  
+function setTokenCookie(res, token) {
+    const cookieOptions = {
+        httpOnly: true,
+        expires: new Date(Date.now() + 7*24*60*60*1000)
+    };
+    res.cookie('refreshToken', token, cookieOptions);
+}
+
+================================================================================
+File: accounts\account.model.js
+Size: 1.45 kB
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        AccountId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        email: { type: DataTypes.STRING, allowNull: false }, 
+        passwordHash: { type: DataTypes.STRING, allowNull: false }, 
+        title: { type: DataTypes.STRING, allowNull: false }, 
+        firstName: { type: DataTypes.STRING, allowNull: false }, 
+        lastName: { type: DataTypes.STRING, allowNull: false }, 
+        acceptTerms: { type: DataTypes.BOOLEAN },
+        role: { type: DataTypes.STRING, allowNull: false }, 
+        verificationToken: { type: DataTypes.STRING },
+        verified: {type: DataTypes.DATE },
+        resetToken: {type: DataTypes.STRING },
+        resetTokenExpires: { type: DataTypes.DATE },
+        passwordReset: { type: DataTypes.DATE},
+        created: {type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW }, 
+        updated: { type: DataTypes.DATE },
+        isVerified: {
+            type: DataTypes.VIRTUAL,
+            get() { return !!(this.verified || this.passwordReset); }
+        }
+    };
+
+    const options = {
+        timestamps: false,
+        defaultScope: {
+            attributes: {exclude: ['passwordHash'] }
+        },
+        scopes: {
+            withHash: { attributes: {}, }
+        }
+    };
+
+    return sequelize.define('Account', attributes, options);
+    
+}
+
+================================================================================
+File: accounts\account.service.js
+Size: 16.54 kB
+================================================================================
+
+const config = require('config.json'); 
+const jwt = require('jsonwebtoken'); 
+const bcrypt = require('bcryptjs'); 
+const crypto= require("crypto"); 
+const { Op} = require('sequelize');
+const sendEmail = require('_helpers/send-email'); 
+const db = require('_helpers/db');
+const Role = require('_helpers/role');
+
+module.exports = { 
+    authenticate,
+    refreshToken,
+    revokeToken,
+    register,
+    verifyEmail,
+    forgotPassword,
+    validateResetToken,
+    resetPassword, 
+    getAll,
+    getById,
+    create,
+    logActivity,
+    getAccountActivities,
+    getAllActivityLogs,
+    update,
+    updatePreferences,
+    getPreferences,
+    delete: _delete
+};
+
+async function authenticate({ email, password, ipAddress, browserInfo }) {
+    const account = await db.Account.scope('withHash').findOne({ where: { email } });
+  
+    if (!account || !account.isVerified || !(await bcrypt.compare(password, account.passwordHash))) {
+      throw 'Email or password is incorrect';
+    }
+  
+    const jwtToken = generateJwtToken(account);
+    const refreshToken = generateRefreshToken(account, ipAddress);
+  
+    await refreshToken.save();
+  
+    try {
+      await logActivity(account.AccountId, 'login', ipAddress, browserInfo);
+    } catch (error) {
+      console.error('Error logging activity:', error);
+    }
+  
+    return {
+      ...basicDetails(account),
+      jwtToken,
+      refreshToken: refreshToken.token
+    };
+  }
+async function logActivity(AccountId, actionType, ipAddress, browserInfo, updateDetails = '') {
+    try {
+      // Create a new log entry in the 'activity_log' table
+      await db.ActivityLog.create({
+        AccountId,
+        actionType,
+        actionDetails: `IP Address: ${ipAddress}, Browser Info: ${browserInfo}, Details: ${updateDetails}`,
+        timestamp: new Date()
+      });
+  
+      // Count the number of logs for the user
+      const logCount = await db.ActivityLog.count({ where: { AccountId } });
+  
+      if (logCount > 10) {
+        // Find and delete the oldest logs
+        const logsToDelete = await db.ActivityLog.findAll({
+          where: { AccountId },
+          order: [['timestamp', 'ASC']],
+          limit: logCount - 10
+        });
+  
+        if (logsToDelete.length > 0) {
+          const logIdsToDelete = logsToDelete.map(log => log.activityLogId);
+  
+          await db.ActivityLog.destroy({
+            where: {
+              activityLogId: {
+                [Op.in]: logIdsToDelete
+              }
+            }
+          });
+          console.log(`Deleted ${logIdsToDelete.length} oldest log(s) for user ${AccountId}.`);
+        }
+      }
+    } catch (error) {
+      console.error('Error logging activity:', error);
+      throw error;
+    }
+  }
+  // Add this new service function
+async function getAllActivityLogs(filters = {}) {
+  try {
+      let whereClause = {};
+      
+      // Apply filters
+      if (filters.actionType) {
+          whereClause.actionType = { [Op.like]: `%${filters.actionType}%` };
+      }
+      
+      if (filters.userId) {
+          whereClause.AccountId = filters.userId;
+      }
+      
+      if (filters.startDate || filters.endDate) {
+          const startDate = filters.startDate ? new Date(filters.startDate) : new Date(0);
+          const endDate = filters.endDate ? new Date(filters.endDate) : new Date();
+          whereClause.timestamp = { [Op.between]: [startDate, endDate] };
+      }
+
+      // Get all activity logs with user details
+      const logs = await db.ActivityLog.findAll({
+          where: whereClause,
+          include: [{
+              model: db.Account,
+              attributes: ['email', 'firstName', 'lastName', 'role'],
+              required: true
+          }],
+          order: [['timestamp', 'DESC']]
+      });
+
+      // Format the response
+      return logs.map(log => {
+          const formattedDate = new Intl.DateTimeFormat('en-US', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+          }).format(new Date(log.timestamp));
+
+          return {
+              activityLogId: log.activityLogId,
+              userId: log.AccountId,
+              userEmail: log.Account.email,
+              userRole: log.Account.role,
+              userName: `${log.Account.firstName} ${log.Account.lastName}`,
+              actionType: log.actionType,
+              actionDetails: log.actionDetails,
+              timestamp: formattedDate
+          };
+      });
+  } catch (error) {
+      console.error('Error retrieving all activity logs:', error);
+      throw new Error('Error retrieving activity logs');
+  }
+}
+    async function getAccountActivities(AccountId, filters = {}) {
+      const account = await getAccount(AccountId);
+      if (!account) throw new Error('User not found');
+    
+      let whereClause = { AccountId };
+    
+      // Apply optional filters such as action type and timestamp range
+      if (filters.actionType) {
+        whereClause.actionType = { [Op.like]: `%${filters.actionType}%` };
+      }
+      if (filters.startDate || filters.endDate) {
+        const startDate = filters.startDate ? new Date(filters.startDate) : new Date(0);
+        const endDate = filters.endDate ? new Date(filters.endDate) : new Date();
+        whereClause.timestamp = { [Op.between]: [startDate, endDate] };
+      }
+    
+      try {
+        const activities = await db.ActivityLog.findAll({ where: whereClause });
+        return activities.map(activity => {
+          const formattedDate = new Intl.DateTimeFormat('en-US', {
+              year: '2-digit',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+          }).format(new Date(activity.timestamp));
+
+          return {
+              activityLogId: activity.activityLogId,
+              AccountId: activity.AccountId,
+              actionType: activity.actionType,
+              actionDetails: activity.actionDetails,
+              timestamp: formattedDate // Replace raw timestamp with formatted date
+          };
+      });
+      } catch (error) {
+        console.error('Error retrieving activities:', error);
+        throw new Error('Error retrieving activities');
+      }
+    }
+async function refreshToken({ token, ipAddress }) { 
+    const refreshToken = await getRefreshToken(token); 
+    const account = await refreshToken.getAccount();
+
+    const newRefreshToken = generateRefreshToken (account, ipAddress); 
+    refreshToken.revoked = Date.now();
+    refreshToken.revokedByIp = ipAddress;
+    refreshToken.replacedByToken = newRefreshToken.token;
+    await refreshToken.save();
+    await newRefreshToken.save();
+    
+    const jwtToken = generateJwtToken(account);
+    
+    return {
+        ...basicDetails (account),
+        jwtToken,
+        refreshToken: newRefreshToken.token
+    };
+}
+async function revokeToken({ token, ipAddress }) { 
+    const refreshToken = await getRefreshToken (token);
+    
+    refreshToken.revoked = Date.now();
+    refreshToken.revokedByIp = ipAddress; 
+    await refreshToken.save();
+}
+async function register(params, origin) {
+    if (await db.Account.findOne({ where: { email: params.email } })) {
+        return await sendAlreadyRegisteredEmail (params.email, origin);
+    }
+    
+    const account = new db.Account (params);
+
+    const isFirstAccount = (await db.Account.count()) === 0; 
+    account.role = isFirstAccount? Role.Admin: Role.User; 
+    account.verificationToken = randomTokenString();
+    
+    account.passwordHash = await hash (params.password);
+    
+    await account.save();
+      
+    const preferencesData = {
+      AccountId: account.AccountId, // Reference to the newly created user's ID
+      theme: 'light',  // Default theme (you can modify these defaults as needed)
+      notifications: true,  // Default notifications preference
+      language: 'en'   // Default language
+    };
+    
+    // Save the preferences for the user
+    await db.Preferences.create(preferencesData);
+    await sendVerificationEmail (account, origin);
+}
+async function verifyEmail({token}) {
+    const account = await db.Account.findOne({ where: { verificationToken: token} });
+
+    if (!account) throw 'Verification failed';
+
+    account.verified = Date.now();
+    account.verificationToken = null; 
+    await account.save();
+}
+async function forgotPassword({ email }, origin) {
+    const account = await db.Account.findOne({ where: { email } });
+
+    if (!account) return;
+    
+    account.resetToken = randomTokenString();
+    account.resetTokenExpires= new Date(Date.now() + 24*60*60*1000);
+    await account.save();
+
+    await sendPasswordResetEmail (account, origin);
+}
+async function validateResetToken({token}) { 
+    const account = await db.Account.findOne({ 
+        where: {
+            resetToken: token,
+            resetTokenExpires: { [Op.gt]: Date.now() }
+        }
+    });
+
+    if (!account) throw 'Invalid token';
+
+    return account;
+}
+async function resetPassword({ token, password }, ipAddress, browserInfo) {
+    const account = await validateResetToken({ token });
+  
+     // Add password validation if needed
+     if (password.length < 6) {
+      throw 'Password must be at least 6 characters';
+  }
+    account.passwordHash = await hash(password);
+    account.passwordReset = Date.now();
+    account.resetToken = null;
+    account.resetTokenExpires = null; // Clear the expiry
+    await account.save();
+  
+    try {
+      await logActivity(account.AccountId, 'password_reset', ipAddress, browserInfo);
+    } catch (error) {
+      console.error('Error logging activity:', error);
+    }
+  
+    return;
+  }
+
+async function getAll() {
+    const accounts = await db.Account.findAll(); 
+    return accounts.map(x => basicDetails(x));
+}
+
+async function getById(AccountId) {
+    const account = await getAccount(AccountId); 
+    return basicDetails (account);
+}
+async function create(params) {
+  // Check if the email is already registered
+  const existingAccount = await db.Account.findOne({ where: { email: params.email } });
+  if (existingAccount) {
+      throw `Email "${params.email}" is already registered`;
+  }
+
+  const account = new db.Account(params);
+  account.verified = Date.now();
+  account.passwordHash = await hash(params.password);
+
+  // Save the account
+  await account.save();
+
+  // Create default preferences for the new user
+  await db.Preferences.create({
+      AccountId: account.AccountId,
+      theme: 'light',
+      notifications: true,
+      language: 'en'
+  });
+
+  // Return the basic details of the created account
+  return basicDetails(account);
+}
+async function update(AccountId, params, ipAddress, browserInfo) {
+  const account = await getAccount(AccountId);
+  const oldData = account.toJSON(); // Get current user data as a plain object
+  const updatedFields = []; // Declare updatedFields array
+  const nonUserFields = ['ipAddress', 'browserInfo'];
+
+  // Check if any meaningful changes are being made
+  const hasChanges = Object.keys(params).some(key => 
+    !nonUserFields.includes(key) && 
+    params[key] !== undefined && 
+    params[key] !== oldData[key]
+  );
+
+  if (!hasChanges) {
+    return basicDetails(account);
+  }
+
+  if (params.email && account.email !== params.email && await db.Account.findOne({ where: { email: params.email } })) { 
+      throw 'Email "' + params.email + '" is already taken';
+  }
+
+  if (params.password) {
+      params.passwordHash = await hash(params.password);
+  }
+
+  for (const key in params) {
+    if (params.hasOwnProperty(key) && !nonUserFields.includes(key)) {
+        if (oldData[key] !== params[key]) {
+            updatedFields.push(`${key}: ${oldData[key]} -> ${params[key]}`);
+        }
+    }
+  }
+
+  Object.assign(account, params); 
+  account.updated = Date.now(); 
+
+  try {
+      await account.save();
+
+      // Log activity with updated fields
+      const updateDetails = updatedFields.length > 0 
+          ? `Updated fields: ${updatedFields.join(', ')}` 
+          : 'No fields changed';
+
+      await logActivity(account.AccountId, 'profile update', ipAddress || 'Unknown IP', browserInfo || 'Unknown Browser', updateDetails);
+  } catch (error) {
+      console.error('Error logging activity:', error);
+  }
+
+  return basicDetails(account);
+}
+async function _delete(AccountId) {
+    const account = await getAccount(AccountId);
+    await account.destroy();
+}
+//===================Preferences Get & Update Function===========================
+async function getPreferences(AccountId) {
+  const preferences = await db.Preferences.findOne({
+      where: { AccountId: AccountId },
+      attributes: ['preferenceId', 'userId','theme', 'notifications', 'language']
+  });
+  if (!preferences) throw new Error('User not found');
+  return preferences;
+}
+async function updatePreferences(AccountId, params) {
+  const preferences = await db.Preferences.findOne({ where: { AccountId } });
+  if (!preferences) throw new Error('User not found');
+
+  // Update only the provided fields
+  Object.assign(preferences, params);
+
+  await preferences.save();
+}
+async function getAccount (AccountId) {
+    const account = await db.Account.findByPk(AccountId); 
+    if (!account) throw 'Account not found';
+    return account;
+}
+async function getRefreshToken(token) {
+    const refreshToken = await db.RefreshToken.findOne({ where: {token} });
+    if (!refreshToken || !refreshToken.isActive) throw 'Invalid token'; 
+    return refreshToken;
+}
+async function hash (password) {
+    return await bcrypt.hash (password, 10);
+}
+function generateJwtToken(account) {
+    return jwt.sign({ sub: account.AccountId, AccountId: account.AccountId}, config.secret, { expiresIn: '1h' });
+}
+function generateRefreshToken(account, ipAddress) {
+    return new db.RefreshToken({
+        AccountId: account.AccountId, // Set the AccountId field
+        token: randomTokenString(),
+        expires: new Date(Date.now() + 7*24*60*60*1000), 
+        createdByIp: ipAddress
+    });
+}
+function randomTokenString() {
+    return crypto.randomBytes (40).toString('hex');
+}
+function basicDetails(account) {
+    const { AccountId, title, firstName, lastName, email, phoneNumber, role, created, updated, isVerified } = account; 
+    return { AccountId, title, firstName, lastName, email, phoneNumber, role, created, updated, isVerified };
+}
+async function sendVerificationEmail(account, origin) {
+    let message;
+    if (origin) {
+        const verifyUrl = `${origin}/account/verify-email?token=${account.verificationToken}`; 
+        message = `<p>Please click the below link to verify your email address:</p>;
+                   <p><a href="${verifyUrl}">${verifyUrl}</a></p>`;
+    } else {
+        message = `<p>Please use the below token to verify your email address with the <code>/account/verify-email</code> api route:</p> 
+                   <p><code>${account.verificationToken}</code></p>`;
+    }
+    
+    await sendEmail({
+    to: account.email,
+    subject: 'Sign-up Verification API - Verify Email',
+    html: `<h4>Verify Email</h4>
+          <p>Thanks for registering!</p> 
+          ${message}`
+    });
+}
+async function sendAlreadyRegisteredEmail(email, origin) {
+    let message; 
+    if (origin) {
+        message = `
+        <p>If you don't know your password please visit the <a href="${origin}/account/forgot-password">forgot password</a> page.</p>`; 
+    } else { message = `
+        <p>If you don't know your password you can reset it via the <code>/account/forgot-password</code> api route.</p>`;
+    }
+
+    await sendEmail({
+        to: email,
+        subject: 'Sign-up Verification API - Email Already Registered',
+        html: `<h4>Email Already Registered</h4>
+        <p>Your email <strong>${email}</strong> is already registered.</p> ${message}`
+    });
+}
+async function sendPasswordResetEmail (account, origin) {
+    let message;
+    if (origin) {
+        const resetUrl = `${origin}/account/reset-password?token=${account.resetToken}`;
+        message = `<p>Please click the below link to reset your password, the link will be valid for 1 day:</p>
+                   <p><a href="${resetUrl}">${resetUrl}</a></p>`;
+    } else {
+        message = `<p>Please use the below token to reset your password with the <code>/account/reset-password</code> api route:</p> 
+                   <p><code>${account.resetToken}</code></p>`;
+    }
+    
+    await sendEmail({
+    to: account.email,
+    subject: 'Sign-up Verification API - Reset Password',
+    html: `<h4>Reset Password Email</h4>
+          ${message}`
+    });
+}
+    
+
+================================================================================
+File: accounts\refresh-token.model.js
+Size: 1.07 kB
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        refreshTokenId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        token: { type: DataTypes.STRING },
+        expires: { type: DataTypes.DATE },
+        created: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW }, 
+        createdByIp: { type: DataTypes.STRING },
+        revoked: { type: DataTypes.DATE },
+        revokedByIp: { type: DataTypes.STRING },
+        replacedByToken: { type: DataTypes.STRING }, 
+        AccountId: { type: DataTypes.INTEGER, allowNull: false }, // Make this field required
+        isExpired: {
+            type: DataTypes.VIRTUAL,
+            get() { return Date.now() >= this.expires; }
+        },
+        isActive: {
+            type: DataTypes.VIRTUAL, 
+            get() { return !this.revoked && !this.isExpired; }
+        }
+    };
+
+    const options = {
+        timestamps: false
+    };
+
+    return sequelize.define('refreshToken', attributes, options);
+}
+
+================================================================================
+File: classroom\ai-review.model.js
+Size: 576 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        reviewId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        answerId: { type: DataTypes.INTEGER, allowNull: false },
+        isRelevant: { type: DataTypes.BOOLEAN, allowNull: false },
+        feedback: { type: DataTypes.TEXT, allowNull: false },
+        reviewedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    };
+
+    return sequelize.define('AIReview', attributes, { timestamps: false });
+}
+
+================================================================================
+File: classroom\ai.service.js
+Size: 1.33 kB
+================================================================================
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const model = genAI.getGenerativeModel({
+  model: "gemini-3-flash-preview"
+});
+
+async function reviewAnswer(questionText, answerText) {
+  const prompt = `
+Evaluate if the student answer is relevant to this question.
+
+Question:
+"${questionText}"
+
+Student Answer:
+"${answerText}"
+
+Respond using this exact format:
+
+Relevant: Yes or No
+Feedback: One short sentence explaining why.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+
+    // Extract "Relevant"
+    const relevantMatch = raw.match(/relevant\s*:\s*(yes|no)/i);
+    const isRelevant = relevantMatch
+      ? relevantMatch[1].toLowerCase() === "yes"
+      : false;
+
+    // Extract "Feedback"
+    const feedbackMatch = raw.match(/feedback\s*:\s*(.*)/i);
+    let feedback = feedbackMatch ? feedbackMatch[1].trim() : "";
+
+    if (!feedback) {
+      feedback = raw.split(/[.\n]/)[0];
+    }
+
+    return { isRelevant, feedback };
+  } catch (err) {
+    console.error("Gemini AI Error:", err);
+    return {
+      isRelevant: false,
+      feedback: "Feedback unavailable (AI error)."
+    };
+  }
+}
+
+module.exports = { reviewAnswer };
+
+================================================================================
+File: classroom\answer.model.js
+Size: 578 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        answerId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        questionId: { type: DataTypes.INTEGER, allowNull: false },
+        studentId: { type: DataTypes.INTEGER, allowNull: false },
+        answerText: { type: DataTypes.TEXT, allowNull: false },
+        submittedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    };
+
+    return sequelize.define('Answer', attributes, { timestamps: false });
+}
+
+================================================================================
+File: classroom\classroom.controller.js
+Size: 1.21 kB
+================================================================================
+
+const express = require('express');
+const router = express.Router();
+const authorize = require('_middleware/authorize');
+const classroomService = require('./classroom.service');
+
+
+router.post('/questions', authorize(), createQuestion);
+router.get('/questions', authorize(), getQuestions);
+router.post('/questions/:id/answer', authorize(), submitAnswer);
+
+
+
+function createQuestion(req, res, next) {
+    classroomService.createQuestion(req.body.questionText, req.user.AccountId)
+        .then(question => res.json(question))
+        .catch(next);
+}
+
+function getQuestions(req, res, next) {
+    console.log("STEP 1: Controller reached");
+
+    classroomService.getQuestions()
+        .then(questions => {
+            console.log("STEP 2: Service returned");
+            res.json(questions);
+        })
+        .catch(err => {
+            console.log("STEP 3: Error occurred", err);
+            next(err);
+        });
+}
+function submitAnswer(req, res, next) {
+    classroomService.submitAnswer(
+        req.params.id,
+        req.user.AccountId,
+        req.body.answerText
+    )
+        .then(result => res.json(result))
+        .catch(next);
+}
+
+
+module.exports = router;
+
+================================================================================
+File: classroom\classroom.service.js
+Size: 1.98 kB
+================================================================================
+
+const db = require('_helpers/db');
+const aiService = require('./ai.service');
+
+module.exports = {
+    createQuestion,
+    getQuestions,
+    submitAnswer,
+    getAllQuestions
+};
+
+async function getAllQuestions() {
+    return await db.Question.findAll({
+        attributes: ['questionId', 'questionText', 'createdAt'] // adjust fields to match your model
+    });
+}
+
+
+async function createQuestion(questionText, teacherId) {
+    return await db.Question.create({ questionText, teacherId });
+}
+
+async function getQuestions() {
+    return await db.Question.findAll({ order: [['createdAt', 'DESC']] });
+}
+
+async function submitAnswer(questionId, studentId, answerText) {
+
+    const answer = await db.Answer.create({
+        questionId,
+        studentId,
+        answerText
+    });
+
+    const question = await db.Question.findByPk(questionId);
+
+    const aiResult = await aiService.reviewAnswer(
+        question.questionText,
+        answerText
+    );
+
+    await db.AIReview.create({
+        answerId: answer.answerId,
+        isRelevant: aiResult.isRelevant,
+        feedback: aiResult.feedback
+    });
+
+    return aiResult;
+}
+
+
+/*
+async function submitAnswer(questionId, studentId, answerText) {
+
+    const answer = await db.Answer.create({
+        questionId,
+        studentId,
+        answerText
+    });
+
+    let aiResult = {
+        isRelevant: null,
+        feedback: 'AI review unavailable (billing disabled).'
+    };
+
+    try {
+        const question = await db.Question.findByPk(questionId);
+
+        aiResult = await aiService.reviewAnswer(
+            question.questionText,
+            answerText
+        );
+
+        await db.AIReview.create({
+            answerId: answer.answerId,
+            isRelevant: aiResult.isRelevant,
+            feedback: aiResult.feedback
+        });
+
+    } catch (err) {
+        console.error('AI skipped:', err.message);
+    }
+
+    return aiResult;
+}
+*/
+
+================================================================================
+File: classroom\question.model.js
+Size: 514 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        questionId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        questionText: { type: DataTypes.TEXT, allowNull: false },
+        teacherId: { type: DataTypes.INTEGER, allowNull: false },
+        createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    };
+
+    return sequelize.define('Question', attributes, { timestamps: false });
+}
+
+================================================================================
+File: config.json
+Size: 514 B
+================================================================================
+
+{
+  "database": {
+      "host": "localhost",
+      "port": 3306,
+      "user": "root",   
+      "password": "root",
+     "database": "api_backend_boilerplate"
+  },
+  "secret": "secret@#$%&*()_+", 
+  "emailFrom": "info@node-mysql-signup-verification-api.com",
+  "smtpOptions": {
+      "host": "smtp.ethereal.email", 
+      "port": 587,
+      "auth": {
+          "user":"ludwig32@ethereal.email",
+          "pass":"PWAFmDNA94gr3xHJDE"
+      },
+        "tls": {
+            "rejectUnauthorized": false
+        }
+  }
+}
+
+================================================================================
+File: models\activitylog.model.js
+Size: 664 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        activityLogId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        AccountId: { type: DataTypes.INTEGER, allowNull: false },
+        actionType: { type: DataTypes.STRING, allowNull: false }, // Must not be null
+        actionDetails: { type: DataTypes.TEXT, allowNull: true },
+        timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+    };
+
+    const options = {
+        timestamps: false // No additional timestamps
+    };
+
+    return sequelize.define('ActivityLog', attributes, options);
+}
+
+================================================================================
+File: models\arduino_log.model.js
+Size: 682 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        cardLogId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        cardUID: { type: DataTypes.STRING, allowNull: false },
+        event: { type: DataTypes.STRING, allowNull: false },
+        details: { type: DataTypes.TEXT, allowNull: true },
+        timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        AccountId: { type: DataTypes.INTEGER, allowNull: false } // Link log to user
+    };
+
+    const options = {
+        timestamps: false
+    };
+
+    return sequelize.define('ArduinoLog', attributes, options);
+}
+
+================================================================================
+File: models\preferences.model.js
+Size: 890 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        preferenceId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        AccountId: { type: DataTypes.INTEGER, allowNull: false },
+        theme: { type: DataTypes.ENUM('light', 'dark'), allowNull: false, defaultValue: 'light' },
+        notifications: { type: DataTypes.BOOLEAN, allowNull: true, defaultValue: true },
+        language: { type: DataTypes.ENUM('en', 'fr'), allowNull: false, defaultValue: 'en' },
+    };
+    const options = {
+        defaultScope: {
+            attributes: { exclude: [
+                'theme', 'notifications', 'language'
+                ] 
+            }
+        },
+        scopes: {
+            withHash: { attributes: {} }
+        }
+    };
+
+    return sequelize.define('Preferences', attributes,options);
+}
+
+================================================================================
+File: package.json
+Size: 1.13 kB
+================================================================================
+
+{
+  "name": "boilerplate-api-main",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "export:all": "folder2txt --output backend.txt C:/UsersMY PC/OneDrive/Documents/JAVA/Extra/offLineBoilerPlateApi-main --exclude node_modules --exclude .angular --exclude .vscode --exclude .git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.0",
+    "express-jwt": "^8.4.1",
+    "folder2txt": "^1.0.2",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.3",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.15",
+    "openai": "^6.24.0",
+    "rootpath": "^0.1.2",
+    "sequelize": "^6.37.3",
+    "swagger-ui-express": "^5.0.1",
+    "undici": "^7.22.0",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}
+
+
+================================================================================
+File: README.md
+Size: 154 B
+================================================================================
+
+﻿# LightGuardAPI
+https://jasonwatmore.com/post/2020/09/08/nodejs-mysql-boilerplate-api-with-email-sign-up-verification-authentication-forgot-password
+
+
+================================================================================
+File: server.js
+Size: 1.26 kB
+================================================================================
+
+require('rootpath')();
+require('dotenv').config();
+const express = require('express');
+const app = express();
+const cors = require('cors');
+const errorHandler = require('_middleware/error-handler');
+const path = require('path');
+const bodyParser = require('body-parser')
+const cookieParser = require('cookie-parser');
+// Configure CORS once with specific options
+// specify the frontend origin
+// allow cookies and other credentials to be sent
+app.use(cors({origin: 'http://localhost:4200', credentials: true }));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cookieParser());
+
+app.use(express.static(path.join(__dirname, 'products')));
+
+app.use(cors({ origin: (origin, callback) => callback(null, true), credentials: true }));
+app.use('/accounts', require('./accounts/account.controller'));
+app.use('/api-docs', require('./_helpers/swagger'));
+// Add classroom routes
+app.use('/classroom', require('./classroom/classroom.controller'));
+
+app.use(errorHandler);
+
+const port = process.env.NODE_ENV === 'production' ? (process.env.PORT || 80) : 4000;
+app.listen(port, () => console.log('Server listening on port ' + port));
+
+================================================================================
+File: swagger.yaml
+Size: 23.01 kB
+================================================================================
+
+openapi: 3.0.0
+info:
+  title: Node.js Sign-up and Verification API
+  description: Node.js and MySQL - API with email sign-up, verification, authentication and forgot password
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+
+paths:
+  /accounts/authenticate:
+    post:
+      summary: Authenticate account credentials and return a JWT token and a cookie with a refresh token
+      description: Accounts must be verified before authenticating.
+      operationId: authenticate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: "jason@example.com"
+                password:
+                  type: string
+                  example: "pass123"
+              required:
+                - email
+                - password
+      responses:
+        "200":
+          description: Account details, a JWT access token and a refresh token cookie
+          headers:
+            Set-Cookie:
+              description: "`refreshToken`"
+              schema:
+                type: string
+                example: refreshToken=51872eca5efedcf424db4cf5afd16a9d00ad25b743a034c9c221afc85d18dcd5e4ad6e3f08607550; Path=/; Expires=Tue, 16 Jun 2020 09:14:17 GMT; HttpOnly
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "5eb12e197e06a76ccdefc121"
+                  title:
+                    type: string
+                    example: "Mr"
+                  firstName:
+                    type: string
+                    example: "Jason"
+                  lastName:
+                    type: string
+                    example: "Watmore"
+                  email:
+                    type: string
+                    example: "jason@example.com"
+                  role:
+                    type: string
+                    example: "Admin"
+                  created:
+                    type: string
+                    example: "2020-05-05T09:12:57.848Z"
+                  isVerified:
+                    type: boolean
+                    example: true
+                  jwtToken:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZWIxMmUxOTdlMDZhNzZjY2RlZmMxMjEiLCJpZCI6IjVlYjEyZTE5N2UwNmE3NmNjZGVmYzEyMSIsImlhdCI6MTU4ODc1ODE1N30.xR9H0STbFOpSkuGA9jHNZOJ6eS7umHHqKRhI807YT1Y"
+        "400":
+          description: The email or password is incorrect
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email or password is incorrect"
+  /accounts/refresh-token:
+    post:
+      summary: Use a refresh token to generate a new JWT token and a new refresh token
+      description: The refresh token is sent and returned via cookies.
+      operationId: refreshToken
+      parameters:
+        - in: cookie
+          name: refreshToken
+          description: The `refreshToken` cookie
+          schema:
+            type: string
+            example: 51872eca5efedcf424db4cf5afd16a9d00ad25b743a034c9c221afc85d18dcd5e4ad6e3f08607550
+      responses:
+        "200":
+          description: Account details, a JWT access token and a new refresh token cookie
+          headers:
+            Set-Cookie:
+              description: "`refreshToken`"
+              schema:
+                type: string
+                example: refreshToken=51872eca5efedcf424db4cf5afd16a9d00ad25b743a034c9c221afc85d18dcd5e4ad6e3f08607550; Path=/; Expires=Tue, 16 Jun 2020 09:14:17 GMT; HttpOnly
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "5eb12e197e06a76ccdefc121"
+                  title:
+                    type: string
+                    example: "Mr"
+                  firstName:
+                    type: string
+                    example: "Jason"
+                  lastName:
+                    type: string
+                    example: "Watmore"
+                  email:
+                    type: string
+                    example: "jason@example.com"
+                  role:
+                    type: string
+                    example: "Admin"
+                  created:
+                    type: string
+                    example: "2020-05-05T09:12:57.848Z"
+                  isVerified:
+                    type: boolean
+                    example: true
+                  jwtToken:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZWIxMmUxOTdlMDZhNzZjY2RlZmMxMjEiLCJpZCI6IjVlYjEyZTE5N2UwNmE3NmNjZGVmYzEyMSIsImlhdCI6MTU4ODc1ODE1N30.xR9H0STbFOpSkuGA9jHNZOJ6eS7umHHqKRhI807YT1Y"
+        "400":
+          description: The refresh token is invalid, revoked or expired
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invalid token"
+  /accounts/revoke-token:
+    post:
+      summary: Revoke a refresh token
+      description: Admin users can revoke the tokens of any account, regular users can only revoke their own tokens.
+      operationId: revokeToken
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: cookie
+          name: refreshToken
+          description: The refresh token can be sent in a cookie or the post body, if both are sent the token in the body is used.
+          schema:
+            type: string
+            example: 51872eca5efedcf424db4cf5afd16a9d00ad25b743a034c9c221afc85d18dcd5e4ad6e3f08607550
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  example: "51872eca5efedcf424db4cf5afd16a9d00ad25b743a034c9c221afc85d18dcd5e4ad6e3f08607550"
+      responses:
+        "200":
+          description: The refresh token was successfully revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Token revoked"
+        "400":
+          description: The refresh token is invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invalid token"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+  /accounts/register:
+    post:
+      summary: Register a new user account and send a verification email
+      description: The first account registered in the system is assigned the `Admin` role, other accounts are assigned the `User` role.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: "Mr"
+                firstName:
+                  type: string
+                  example: "Jason"
+                lastName:
+                  type: string
+                  example: "Watmore"
+                email:
+                  type: string
+                  example: "jason@example.com"
+                password:
+                  type: string
+                  example: "pass123"
+                confirmPassword:
+                  type: string
+                  example: "pass123"
+                acceptTerms:
+                  type: boolean
+              required:
+                - title
+                - firstName
+                - lastName
+                - email
+                - password
+                - confirmPassword
+                - acceptTerms
+      responses:
+        "200":
+          description: The registration request was successful and a verification email has been sent to the specified email address
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Registration successful, please check your email for verification instructions"
+  /accounts/verify-email:
+    post:
+      summary: Verify a new account with a verification token received by email after registration
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  example: "3c7f8d9c4cb348ff95a0b74a1452aa24fc9611bb76768bb9eafeeb826ddae2935f1880bc7713318f"
+              required:
+                - token
+      responses:
+        "200":
+          description: Verification was successful so you can now login to the account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Verification successful, you can now login"
+        "400":
+          description: Verification failed due to an invalid token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Verification failed"
+  /accounts/forgot-password:
+    post:
+      summary: Submit email address to reset the password on an account
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: "jason@example.com"
+              required:
+                - email
+      responses:
+        "200":
+          description: The request was received and an email has been sent to the specified address with password reset instructions (if the email address is associated with an account)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Please check your email for password reset instructions"
+  /accounts/validate-reset-token:
+    post:
+      summary: Validate the reset password token received by email after submitting to the /accounts/forgot-password route
+      operationId: validateResetToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  example: "3c7f8d9c4cb348ff95a0b74a1452aa24fc9611bb76768bb9eafeeb826ddae2935f1880bc7713318f"
+              required:
+                - token
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Token is valid"
+        "400":
+          description: Token is invalid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invalid token"
+  /accounts/reset-password:
+    post:
+      summary: Reset the password for an account
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  example: "3c7f8d9c4cb348ff95a0b74a1452aa24fc9611bb76768bb9eafeeb826ddae2935f1880bc7713318f"
+                password:
+                  type: string
+                  example: "newPass123"
+                confirmPassword:
+                  type: string
+                  example: "newPass123"
+              required:
+                - token
+                - password
+                - confirmPassword
+      responses:
+        "200":
+          description: Password reset was successful so you can now login to the account with the new password
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Password reset successful, you can now login"
+        "400":
+          description: Password reset failed due to an invalid token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invalid token"
+  /accounts:
+    get:
+      summary: Get a list of all accounts
+      description: Restricted to admin users.
+      operationId: getAllAccounts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: An array of all accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      example: "5eb12e197e06a76ccdefc121"
+                    title:
+                      type: string
+                      example: "Mr"
+                    firstName:
+                      type: string
+                      example: "Jason"
+                    lastName:
+                      type: string
+                      example: "Watmore"
+                    email:
+                      type: string
+                      example: "jason@example.com"
+                    role:
+                      type: string
+                      example: "Admin"
+                    created:
+                      type: string
+                      example: "2020-05-05T09:12:57.848Z"
+                    updated:
+                      type: string
+                      example: "2020-05-08T03:11:21.553Z"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+    post:
+      summary: Create a new account
+      description: Restricted to admin users.
+      operationId: createAccount
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: "Mr"
+                firstName:
+                  type: string
+                  example: "Jason"
+                lastName:
+                  type: string
+                  example: "Watmore"
+                email:
+                  type: string
+                  example: "jason@example.com"
+                password:
+                  type: string
+                  example: "pass123"
+                confirmPassword:
+                  type: string
+                  example: "pass123"
+                role:
+                  type: string
+                  enum: [Admin, User]
+              required:
+                - title
+                - firstName
+                - lastName
+                - email
+                - password
+                - confirmPassword
+                - role
+      responses:
+        "200":
+          description: Account created successfully, verification is not required for accounts created with this endpoint. The details of the new account are returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "5eb12e197e06a76ccdefc121"
+                  title:
+                    type: string
+                    example: "Mr"
+                  firstName:
+                    type: string
+                    example: "Jason"
+                  lastName:
+                    type: string
+                    example: "Watmore"
+                  email:
+                    type: string
+                    example: "jason@example.com"
+                  role:
+                    type: string
+                    example: "Admin"
+                  created:
+                    type: string
+                    example: "2020-05-05T09:12:57.848Z"
+        "400":
+          description: Email is already registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email 'jason@example.com' is already registered"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+  /accounts/{id}:
+    parameters:
+      - in: path
+        name: id
+        description: Account id
+        required: true
+        example: "5eb12e197e06a76ccdefc121"
+        schema:
+          type: string
+    get:
+      summary: Get a single account by id
+      description: Admin users can access any account, regular users are restricted to their own account.
+      operationId: getAccountById
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Details of the specified account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "5eb12e197e06a76ccdefc121"
+                  title:
+                    type: string
+                    example: "Mr"
+                  firstName:
+                    type: string
+                    example: "Jason"
+                  lastName:
+                    type: string
+                    example: "Watmore"
+                  email:
+                    type: string
+                    example: "jason@example.com"
+                  role:
+                    type: string
+                    example: "Admin"
+                  created:
+                    type: string
+                    example: "2020-05-05T09:12:57.848Z"
+                  updated:
+                    type: string
+                    example: "2020-05-08T03:11:21.553Z"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+    put:
+      summary: Update an account
+      description: Admin users can update any account including role, regular users are restricted to their own account and cannot update role.
+      operationId: updateAccount
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: "Mr"
+                firstName:
+                  type: string
+                  example: "Jason"
+                lastName:
+                  type: string
+                  example: "Watmore"
+                email:
+                  type: string
+                  example: "jason@example.com"
+                password:
+                  type: string
+                  example: "pass123"
+                confirmPassword:
+                  type: string
+                  example: "pass123"
+                role:
+                  type: string
+                  enum: [Admin, User]
+      responses:
+        "200":
+          description: Account updated successfully. The details of the updated account are returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "5eb12e197e06a76ccdefc121"
+                  title:
+                    type: string
+                    example: "Mr"
+                  firstName:
+                    type: string
+                    example: "Jason"
+                  lastName:
+                    type: string
+                    example: "Watmore"
+                  email:
+                    type: string
+                    example: "jason@example.com"
+                  role:
+                    type: string
+                    example: "Admin"
+                  created:
+                    type: string
+                    example: "2020-05-05T09:12:57.848Z"
+                  updated:
+                    type: string
+                    example: "2020-05-08T03:11:21.553Z"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+    delete:
+      summary: Delete an account
+      description: Admin users can delete any account, regular users are restricted to their own account.
+      operationId: deleteAccount
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Account deleted successfully"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    UnauthorizedError:
+      description: Access token is missing or invalid, or the user does not have access to perform the action
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Unauthorized"
+    NotFoundError:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Not Found"
+
+================================================================================
+File: _helpers\db.js
+Size: 1.81 kB
+================================================================================
+
+    const config = require('config.json');
+    const mysql = require('mysql2/promise');
+    const { Sequelize } = require('sequelize');
+
+    module.exports = db = {};
+
+    initialize();
+    async function initialize() { 
+        const { host, port, user, password, database } = config.database;
+        const connection = await mysql.createConnection({ host, port, user, password });
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
+        
+        await connection.end();
+
+        const sequelize = new Sequelize(database, user, password, { host: 'localhost', dialect: 'mysql' });
+
+    // Initialize models and add them to the exported `db` object
+
+    db.Account = require('../accounts/account.model')(sequelize);
+    db.RefreshToken = require('../accounts/refresh-token.model')(sequelize);
+    db.Preferences = require('../models/preferences.model')(sequelize);
+    db.ActivityLog = require('../models/activitylog.model')(sequelize);
+
+    db.Account.hasMany(db.RefreshToken, { foreignKey: 'AccountId', onDelete: 'CASCADE' });
+    db.RefreshToken.belongsTo(db.Account, { foreignKey: 'AccountId' });
+
+    db.ActivityLog.belongsTo(db.Account, { foreignKey: 'AccountId' });
+    db.Preferences.belongsTo(db.Account, { foreignKey: 'AccountId' });
+
+    db.Question = require('../classroom/question.model')(sequelize);
+    db.Answer = require('../classroom/answer.model')(sequelize);
+    db.AIReview = require('../classroom/ai-review.model')(sequelize);
+
+    // Associations
+    db.Question.hasMany(db.Answer, { foreignKey: 'questionId' });
+    db.Answer.belongsTo(db.Question, { foreignKey: 'questionId' });
+
+    db.Answer.hasOne(db.AIReview, { foreignKey: 'answerId' });
+    db.AIReview.belongsTo(db.Answer, { foreignKey: 'answerId' });
+
+    await sequelize.sync({ alter: true });
+}
+
+
+================================================================================
+File: _helpers\role.js
+Size: 77 B
+================================================================================
+
+module.exports = {
+    Admin: 'Admin',
+    Staff: 'Staff',
+    User: 'User'
+}
+
+================================================================================
+File: _helpers\send-email.js
+Size: 319 B
+================================================================================
+
+const nodemailer = require('nodemailer');
+const config = require('config.json');
+
+module.exports = sendEmail;
+
+async function sendEmail({ to, subject, html, from = config.emailFrom }) {
+    const transporter = nodemailer.createTransport(config.smtpOptions);
+    await transporter.sendMail({ from, to, subject, html});
+}
+
+================================================================================
+File: _helpers\swagger.js
+Size: 297 B
+================================================================================
+
+const express = require('express');
+const router = express.Router();
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const swaggerDocument = YAML.load('./swagger.yaml');
+
+router.use('/', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+module.exports = router;
+
+================================================================================
+File: _middleware\authorize.js
+Size: 2.15 kB
+================================================================================
+
+const { expressjwt: jwt } = require('express-jwt');
+const { secret } = require('config.json');
+const db = require('_helpers/db');
+const Role = require('_helpers/role');
+
+module.exports = authorize;
+
+function authorize(roles = []) {
+    // Convert single role to array if string is provided
+    if (typeof roles === 'string') {
+        roles = [roles];
+    }
+
+    return [
+        // Authenticate JWT token and attach decoded token to request as req.auth
+        jwt({ 
+            secret, 
+            algorithms: ['HS256'],
+            requestProperty: 'auth'
+        }),
+
+        // Authorize based on user role
+        async (req, res, next) => {
+            try {
+                const account = await db.Account.findByPk(req.auth.AccountId);
+                if (!account) {
+                    return res.status(401).json({ message: 'Account no longer exists' });
+                }
+                if (roles.length && !roles.includes(account.role)) {
+                    return res.status(401).json({ message: 'Unauthorized - Insufficient role permissions' });
+                }
+
+                // authentication and authorization successful
+                // attach user and role to request object
+                req.user = {
+                    ...req.auth,
+                    role: account.role,
+                    BranchId: account.BranchId  // Make sure this is being set correctly
+                };
+                
+                // Add method to check if user owns a refresh token
+                const refreshTokens = await account.getRefreshTokens();
+                req.user.ownsToken = token => !!refreshTokens.find(x => x.token === token);
+
+                // Log authorization attempt
+                console.log(`Authorization successful for user ${account.email} with role ${account.role}`);
+
+                next();
+            } catch (error) {
+                console.error('Authorization error:', error);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Internal server error during authorization'
+                });
+            }
+        }
+    ];
+}
+
+================================================================================
+File: _middleware\error-handler.js
+Size: 689 B
+================================================================================
+
+module.exports = errorHandler;
+
+function errorHandler(err, req, res, next) {
+    switch (true) {
+        case typeof err === 'string':
+            const is404 = err.toLowerCase().endsWith('not found');
+            const statusCode = is404 ? 404 : 400;
+            return res.status(statusCode).json({ message: err });
+        case err.message && err.message.toLowerCase().includes('deactivated'):
+            return res.status(403).json({ message: 'deactivated' });
+        case err.name === 'UnauthorizedError':
+            return res.status(401).json({ message: 'Unauthorized error-handler' });
+        default:
+            return res.status(500).json({ message: err.message });
+    }
+}
+
+
+================================================================================
+File: _middleware\validate-request.js
+Size: 420 B
+================================================================================
+
+module.exports = validateRequest;
+
+function validateRequest(req, next, schema) {
+    const options = {
+        abortEarly: false,
+        allowUnknown: true,
+        stripUnknown: true
+    };
+    const { error, value } = schema.validate(req.body, options);
+    if (error) {
+        next(`Validation error: ${error.details.map(x => x.message).join(', ')}`);
+    } else {
+        req.body = value;
+        next();
+    }
+}
+

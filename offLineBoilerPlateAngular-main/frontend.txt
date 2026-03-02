@@ -1,3 +1,8 @@
+================================================================================
+File: angular.json
+Size: 3.53 kB
+================================================================================
+
 {
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
@@ -28,9 +33,12 @@
               "src/assets"
             ],
             "styles": [
-              "src/styles.less"
+              "src/styles.less",
+              "node_modules/bootstrap/dist/css/bootstrap.min.css"
             ],
-            "scripts": []
+            "scripts": [
+              "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"
+            ]
           },
           "configurations": {
             "production": {
@@ -96,9 +104,12 @@
               "src/assets"
             ],
             "styles": [
-              "src/styles.less"
+              "src/styles.less",
+              "node_modules/bootstrap/dist/css/bootstrap.min.css"
             ],
-            "scripts": []
+            "scripts": [
+              "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"
+            ]
           }
         }
       }
@@ -108,7 +119,6 @@
     "analytics": "e493dbb3-a581-4dce-9a48-c9918f0714ec"
   }
 }
-
 
 ================================================================================
 File: LICENSE
@@ -140,7 +150,7 @@ SOFTWARE.
 
 ================================================================================
 File: package.json
-Size: 1.46 kB
+Size: 1.53 kB
 ================================================================================
 
 {
@@ -164,6 +174,8 @@ Size: 1.46 kB
         "@angular/platform-browser": "^15.0.0",
         "@angular/platform-browser-dynamic": "^15.0.0",
         "@angular/router": "^15.0.0",
+        "@popperjs/core": "^2.11.8",
+        "bootstrap": "^5.3.8",
         "folder2txt": "^1.0.2",
         "rxjs": "~7.5.0",
         "tslib": "^2.3.0",
@@ -1225,16 +1237,43 @@ export class LayoutComponent { }
 
 ================================================================================
 File: src\app\admin\overview.component.html
-Size: 217 B
+Size: 1.24 kB
 ================================================================================
 
-﻿<div class="p-4">
-    <div class="container">
-        <h1>Admin</h1>
-        <p>This section can only be accessed by administrators.</p>
-        <p><a routerLink="accounts">Manage Accounts</a></p>
+﻿<div class="admin-overview fade-in">
+  <div class="container">
+    <!-- Header -->
+    <div class="mb-5">
+      <h1 class="display-6 fw-bold text-primary mb-2">
+        <i class="bi bi-shield-lock-fill me-2"></i>Admin Dashboard
+      </h1>
+      <p class="text-muted lead">
+        Welcome to the administrative area. Manage users and monitor system activity.
+      </p>
     </div>
-</div>
+    <!-- Quick Actions -->
+    <div class="row">
+      <div class="col-md-6 mb-4">
+        <div class="card border-0 shadow-sm h-100 hover-lift">
+          <div class="card-body p-4">
+            <div class="d-flex align-items-center mb-3">
+              <div class="icon-circle bg-primary bg-opacity-10 p-3 rounded-3">
+                <i class="bi bi-people text-primary fs-3"></i>
+              </div>
+              <h3 class="h4 mb-0 ms-3">User Management</h3>
+            </div>
+            <p class="text-muted mb-4">
+              Create, edit, and manage user accounts. Assign roles and monitor user activity.
+            </p>
+            <a routerLink="accounts" class="btn btn-primary">
+              <i class="bi bi-arrow-right-circle me-2"></i>Manage Users
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+   </div>
+ </div>
 
 ================================================================================
 File: src\app\admin\overview.component.ts
@@ -1311,7 +1350,7 @@ export class AppRoutingModule { }
 
 ================================================================================
 File: src\app\app.component.html
-Size: 966 B
+Size: 1.07 kB
 ================================================================================
 
 ﻿<div class="app-container" [ngClass]="{ 'bg-light': account }">
@@ -1320,8 +1359,10 @@ Size: 966 B
         <div class="navbar-nav">
             <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-item nav-link">Home</a>
             <a routerLink="/profile" routerLinkActive="active" class="nav-item nav-link">Profile</a>
-            <a *ngIf="account.role === Role.Admin" routerLink="/admin" routerLinkActive="active" class="nav-item nav-link">Admin</a>
-            <a routerLink="/classroom" class="nav-link">Classroom</a>
+            <a *ngIf="account.role === 'Admin'" routerLink="/admin" routerLinkActive="active" class="nav-item nav-link">Admin</a>
+            <a routerLink="/classroom/subjects" routerLinkActive="active" class="nav-item nav-link">
+                <i class="bi bi-book me-1"></i>Classroom
+            </a>
             <button (click)="logout()" class="btn btn-link nav-item nav-link">Logout</button>
         </div>
     </nav>
@@ -1362,19 +1403,14 @@ export class AppComponent {
 
 ================================================================================
 File: src\app\app.module.ts
-Size: 1.31 kB
+Size: 1.18 kB
 ================================================================================
 
-﻿import { NgModule, APP_INITIALIZER } from '@angular/core';
+﻿import { APP_INITIALIZER } from '@angular/core';
+import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
-
-
-
-
-//used to create fake backend
-import { fakeBackendProvider } from './_helpers';
 
 import { AppRoutingModule } from './app-routing.module';
 import { JwtInterceptor, ErrorInterceptor, appInitializer } from './_helpers';
@@ -1399,132 +1435,659 @@ import { HomeComponent } from './home';
         { provide: APP_INITIALIZER, useFactory: appInitializer, multi: true, deps: [AccountService] },
         { provide: HTTP_INTERCEPTORS, useClass: JwtInterceptor, multi: true },
         { provide: HTTP_INTERCEPTORS, useClass: ErrorInterceptor, multi: true },
-
-        // provider used to create fake backend
-       //fakeBackendProvider
     ],
     bootstrap: [AppComponent]
 })
 export class AppModule { }
 
-
 ================================================================================
-File: src\app\classroom\answer\answer.component.html
-Size: 901 B
-================================================================================
-
-<h2>Submit Answer</h2>
-
-<form [formGroup]="form" (ngSubmit)="submit()">
-
-  <div class="mb-3">
-    <textarea
-      class="form-control"
-      rows="5"
-      formControlName="answerText"
-      placeholder="Write your answer here...">
-    </textarea>
-  </div>
-
-  <button class="btn btn-success"
-          [disabled]="submitting">
-    Submit
-  </button>
-
-</form>
-
-<div *ngIf="feedback" class="mt-4">
-
-  <div class="alert"
-       [ngClass]="{
-         'alert-success': feedback.isRelevant === true,
-         'alert-warning': feedback.isRelevant === false,
-         'alert-secondary': feedback.isRelevant === null
-       }">
-
-    <strong>
-      {{
-        feedback.isRelevant === true ? 'Relevant' :
-        feedback.isRelevant === false ? 'Not Relevant' :
-        'AI Disabled'
-      }}
-    </strong>
-
-    <p class="mb-0">{{ feedback.feedback }}</p>
-  </div>
-
-</div>
-
-================================================================================
-File: src\app\classroom\answer\answer.component.ts
-Size: 1.19 kB
+File: src\app\classroom\answer\answer.component.css
+Size: 4.58 kB
 ================================================================================
 
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+.answer-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
 
-@Component({
-  templateUrl: './answer.component.html'
-})
-export class AnswerComponent implements OnInit {
+/* Back Link */
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  display: inline-block;
+  transition: all 0.2s;
+}
 
-  form!: FormGroup;
-  questionId!: string;
-  feedback: any;
-  submitting = false;
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
 
-  constructor(
-    private route: ActivatedRoute,
-    private fb: FormBuilder,
-    private http: HttpClient
-  ) {}
+/* Question Card */
+.question-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.05);
+}
 
-  ngOnInit() {
-    this.questionId = this.route.snapshot.paramMap.get('id')!;
+.question-header {
+  padding: 1.5rem 1.5rem 0.5rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-    this.form = this.fb.group({
-      answerText: ['', [
-        Validators.required,
-        Validators.maxLength(500)
-      ]]
-    });
+.question-header .badge {
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  font-weight: 500;
+}
+
+.question-content {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+.question-text {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 16px;
+  border-left: 4px solid #0d6efd;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.question-footer {
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+/* Tips Card */
+.tips-card {
+  background: linear-gradient(135deg, #fff3cd 0%, #fff8e7 100%);
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid #ffe69c;
+}
+
+.tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tips-list li {
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  color: #664d03;
+}
+
+.tips-list li:last-child {
+  margin-bottom: 0;
+}
+
+.tips-list i {
+  font-size: 1rem;
+}
+
+/* Answer Card */
+.answer-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.answer-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  background: #f8f9fa;
+}
+
+.answer-body {
+  padding: 1.5rem;
+}
+
+/* Form Elements */
+.form-control {
+  border: 2px solid #e9ecef;
+  border-radius: 16px;
+  padding: 1rem;
+  font-size: 1rem;
+  resize: vertical;
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15);
+}
+
+.form-control.is-invalid {
+  border-color: #dc3545;
+}
+
+.form-control.border-primary {
+  border-color: #0d6efd;
+}
+
+/* Counter */
+.counter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.text-success {
+  color: #198754 !important;
+}
+
+.text-danger {
+  color: #dc3545 !important;
+}
+
+/* Error Messages */
+.error-messages {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f8d7da;
+  border-radius: 12px;
+  color: #842029;
+  font-size: 0.9rem;
+}
+
+.error-messages div {
+  margin-bottom: 0.25rem;
+}
+
+.error-messages div:last-child {
+  margin-bottom: 0;
+}
+
+/* Buttons */
+.btn-primary {
+  background: #0d6efd;
+  border: none;
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0b5ed7;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(13,110,253,0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-outline-secondary {
+  width: 50px;
+  border-radius: 12px;
+  border: 2px solid #6c757d;
+  color: #6c757d;
+  transition: all 0.2s;
+}
+
+.btn-outline-secondary:hover {
+  background: #6c757d;
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* Feedback Section */
+.feedback-section {
+  animation: slideUp 0.3s ease;
+}
+
+.feedback-card {
+  padding: 1.5rem;
+  border-radius: 16px;
+  border-left: 4px solid;
+}
+
+.feedback-success {
+  background: #d1e7dd;
+  border-left-color: #198754;
+  color: #0a3622;
+}
+
+.feedback-warning {
+  background: #fff3cd;
+  border-left-color: #ffc107;
+  color: #664d03;
+}
+
+.feedback-info {
+  background: #e7f1ff;
+  border-left-color: #0d6efd;
+  color: #084298;
+}
+
+.feedback-icon i {
+  color: inherit;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .answer-container {
+    padding: 1rem;
   }
 
-  submit() {
-    if (this.form.invalid) return;
+  .question-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
 
-    this.submitting = true;
-    this.feedback = null;
+  .question-text {
+    font-size: 1rem;
+    padding: 1rem;
+  }
 
-    this.http.post<any>(
-     `http://localhost:4000/classroom/questions/${this.questionId}/answer`,
-       this.form.value
-      ).subscribe({
-      next: res => {
-        this.feedback = res;
-        this.submitting = false;
-      },
-      error: () => this.submitting = false
-    });
+  .answer-body {
+    padding: 1rem;
+  }
+
+  .btn-primary {
+    padding: 0.6rem;
   }
 }
 
 ================================================================================
+File: src\app\classroom\answer\answer.component.html
+Size: 6.85 kB
+================================================================================
+
+<div class="answer-container">
+  <!-- Back Button -->
+  <div class="mb-4">
+    <a routerLink="/classroom" class="back-link">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to Questions
+    </a>
+  </div>
+
+  <div class="row">
+    <!-- Left Column - Question View -->
+    <div class="col-lg-5 mb-4">
+      <div class="question-card">
+        <div class="question-header">
+          <span class="badge bg-primary">
+            <i class="bi bi-question-circle me-1"></i>
+            Question
+          </span>
+          <small class="text-secondary">
+            <i class="bi bi-clock me-1"></i>
+            {{ question?.createdAt | date:'medium' }}
+          </small>
+        </div>
+
+        <div class="question-content">
+          <h5 class="mb-3">What would you like to answer?</h5>
+          <div class="question-text">
+            <p class="mb-0">{{ question?.questionText || 'Loading question...' }}</p>
+          </div>
+        </div>
+
+        <!-- Teacher Info in question card -->
+        <div class="question-footer">
+           <i class="bi bi-person-circle text-primary me-2"></i>
+            <span class="text-secondary">
+               By: <strong>{{ question?.teacherName || 'Teacher' }}</strong>
+            </span>
+</div>
+      </div>
+
+      <!-- Tips Card -->
+      <div class="tips-card mt-4">
+        <h6 class="mb-3">
+          <i class="bi bi-lightbulb text-warning me-2"></i>
+          Answering Tips
+        </h6>
+        <ul class="tips-list mb-0">
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Read the question carefully
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Provide specific examples
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Be clear and concise
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Check your answer before submitting
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right Column - Answer Form -->
+    <div class="col-lg-7">
+      <div class="answer-card">
+        <div class="answer-header">
+          <h4 class="mb-0">
+            <i class="bi bi-pencil-square text-primary me-2"></i>
+            Your Answer
+          </h4>
+        </div>
+
+        <div class="answer-body">
+          <form [formGroup]="form" (ngSubmit)="submit()">
+            <!-- Answer Text Area -->
+            <div class="mb-4">
+              <textarea
+                class="form-control"
+                [ngClass]="{
+                  'is-invalid': submitted && f.answerText.errors,
+                  'border-primary': form.get('answerText')?.value && !submitted
+                }"
+                rows="8"
+                formControlName="answerText"
+                placeholder="Type your answer here... Be specific and detailed...">
+              </textarea>
+
+              <!-- Character Counter -->
+              <div class="counter mt-2">
+                <small class="text-secondary">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Minimum 10 characters
+                </small>
+                <small [class.text-danger]="(form.get('answerText')?.value?.length || 0) > 400"
+                       [class.text-success]="(form.get('answerText')?.value?.length || 0) <= 400">
+                  {{ form.get('answerText')?.value?.length || 0 }}/500
+                </small>
+              </div>
+
+              <!-- Validation Errors -->
+              <div *ngIf="submitted && f.answerText.errors" class="error-messages">
+                <div *ngIf="f.answerText.errors.required">
+                  <i class="bi bi-exclamation-circle me-1"></i>
+                  Answer is required
+                </div>
+                <div *ngIf="f.answerText.errors.minlength">
+                  <i class="bi bi-exclamation-circle me-1"></i>
+                  Answer must be at least 10 characters
+                </div>
+                <div *ngIf="f.answerText.errors.maxlength">
+                  <i class="bi bi-exclamation-circle me-1"></i>
+                  Answer cannot exceed 500 characters
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-3">
+              <button type="submit" 
+                      [disabled]="submitting" 
+                      class="btn btn-primary flex-grow-1">
+                <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2"></span>
+                <i *ngIf="!submitting" class="bi bi-send me-2"></i>
+                {{ submitting ? 'Submitting...' : 'Submit Answer' }}
+              </button>
+              
+              <button type="button" 
+                      class="btn btn-outline-secondary"
+                      (click)="resetForm()">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+            </div>
+          </form>
+
+          <!-- AI Feedback -->
+          <div *ngIf="feedback" class="feedback-section mt-4">
+            <div class="feedback-card"
+                 [ngClass]="{
+                   'feedback-success': feedback.isRelevant === true,
+                   'feedback-warning': feedback.isRelevant === false,
+                   'feedback-info': feedback.isRelevant === null
+                 }">
+              
+              <div class="d-flex align-items-start">
+                <div class="feedback-icon me-3">
+                  <i class="bi fs-2"
+                     [ngClass]="{
+                       'bi-check-circle-fill': feedback.isRelevant === true,
+                       'bi-exclamation-triangle-fill': feedback.isRelevant === false,
+                       'bi-robot': feedback.isRelevant === null
+                     }"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <h6 class="mb-2">
+                    {{
+                      feedback.isRelevant === true ? 'Great Answer!' :
+                      feedback.isRelevant === false ? 'Needs Improvement' :
+                      'AI Review'
+                    }}
+                  </h6>
+                  <p class="mb-0">{{ feedback.feedback }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading State -->
+<div *ngIf="!question" class="text-center py-5">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <p class="mt-3 text-secondary">Loading question...</p>
+</div>
+
+================================================================================
+File: src\app\classroom\answer\answer.component.ts
+Size: 3.05 kB
+================================================================================
+
+import { Component, OnInit } from "@angular/core";
+import { ActivatedRoute, Router } from "@angular/router";
+import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { HttpClient } from "@angular/common/http";
+import { environment } from "@environments/environment";
+
+@Component({
+  templateUrl: "./answer.component.html",
+  styleUrls: ["./answer.component.css"],
+})
+export class AnswerComponent implements OnInit {
+  form!: FormGroup;
+  questionId!: string;
+  question: any = null;
+  feedback: any = null;
+  submitting = false;
+  submitted = false;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private fb: FormBuilder,
+    private http: HttpClient,
+  ) {}
+
+  ngOnInit() {
+    this.questionId = this.route.snapshot.paramMap.get("id")!;
+
+    this.form = this.fb.group({
+      answerText: [
+        "",
+        [
+          Validators.required,
+          Validators.minLength(10),
+          Validators.maxLength(500),
+        ],
+      ],
+    });
+
+    this.loadQuestion();
+  }
+
+  loadQuestion() {
+    // First try to get from state
+    const state = history.state;
+    if (state && state.question) {
+      this.question = state.question;
+    } else {
+      // If not in state, fetch from API
+      this.http
+        .get<any>(
+          `${environment.apiUrl}/classroom/questions/${this.questionId}`,
+        )
+        .subscribe({
+          next: (data) => {
+            this.question = data;
+            // Format teacher name if not already formatted
+            if (data.teacher) {
+              this.question.teacherName = `${data.teacher.firstName} ${data.teacher.lastName}`;
+            }
+          },
+          error: (err) => {
+            console.error("Error loading question:", err);
+          },
+        });
+    }
+  }
+
+  // convenience getter for easy access to form fields
+  get f() {
+    return this.form.controls;
+  }
+
+  submit() {
+    this.submitted = true;
+
+    if (this.form.invalid) {
+      // Scroll to error
+      document.querySelector(".is-invalid")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      return;
+    }
+
+    this.submitting = true;
+    this.feedback = null;
+
+    this.http
+      .post<any>(
+        `${environment.apiUrl}/classroom/questions/${this.questionId}/answer`,
+        this.form.value,
+      )
+      .subscribe({
+        next: (res) => {
+          this.feedback = res;
+          this.submitting = false;
+          // Scroll to feedback
+          setTimeout(() => {
+            document.querySelector(".feedback-section")?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }, 100);
+        },
+        error: (err) => {
+          console.error("Error submitting answer:", err);
+          this.submitting = false;
+        },
+      });
+  }
+
+  resetForm() {
+    this.form.reset();
+    this.submitted = false;
+    this.feedback = null;
+  }
+}
+
+
+================================================================================
 File: src\app\classroom\classroom-routing.module.ts
-Size: 471 B
+Size: 1.57 kB
 ================================================================================
 
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
+import { AuthGuard } from '@app/_helpers';
 
+import { SubjectsComponent } from './subjects/subjects.component';
+import { SubjectViewComponent } from './subject-view/subject-view.component';
 import { ListComponent } from './list/list.component';
 import { AnswerComponent } from './answer/answer.component';
+import { CreateQuestionComponent } from './create-question.component';
+import { ViewAnswersComponent } from './view-answers/view-answers.component';
 
 const routes: Routes = [
-  { path: '', component: ListComponent },
-  { path: ':id', component: AnswerComponent }
+  { 
+    path: '', 
+    redirectTo: 'subjects',
+    pathMatch: 'full'
+  },
+  { 
+    path: 'subjects', 
+    component: SubjectsComponent,
+    canActivate: [AuthGuard]
+  },
+  { 
+    path: 'subject/:id', 
+    component: SubjectViewComponent,
+    canActivate: [AuthGuard]
+  },
+  { 
+    path: 'all-questions', 
+    component: ListComponent,
+    canActivate: [AuthGuard]
+  },
+  { 
+    path: 'create', 
+    component: CreateQuestionComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['Teacher', 'Admin'] }
+  },
+  { 
+    path: 'view/:id', 
+    component: ViewAnswersComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['Teacher', 'Admin'] }
+  },
+  { 
+    path: ':id', 
+    component: AnswerComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['User', 'Student', 'Teacher', 'Admin'] }
+  }
 ];
 
 @NgModule({
@@ -1535,81 +2098,2829 @@ export class ClassroomRoutingModule {}
 
 ================================================================================
 File: src\app\classroom\classroom.module.ts
-Size: 545 B
+Size: 1.02 kB
 ================================================================================
 
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
+
 
 import { ClassroomRoutingModule } from './classroom-routing.module';
+import { SubjectsComponent } from './subjects/subjects.component';
+import { SubjectViewComponent } from './subject-view/subject-view.component';
 import { ListComponent } from './list/list.component';
 import { AnswerComponent } from './answer/answer.component';
+import { CreateQuestionComponent } from './create-question.component';
+import { ViewAnswersComponent } from './view-answers/view-answers.component';
 
 @NgModule({
   declarations: [
+    SubjectsComponent,
+    SubjectViewComponent,
     ListComponent,
-    AnswerComponent
+    AnswerComponent,
+    CreateQuestionComponent,
+    ViewAnswersComponent
   ],
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    RouterModule,
     ClassroomRoutingModule
   ]
 })
 export class ClassroomModule {}
 
 ================================================================================
-File: src\app\classroom\list\list.component.html
-Size: 436 B
+File: src\app\classroom\create-question.component.css
+Size: 2.44 kB
 ================================================================================
 
-<h2>Classroom Questions</h2>
+.create-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
 
-<div *ngIf="loading">Loading...</div>
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  display: inline-block;
+  transition: all 0.2s;
+}
 
-<div *ngFor="let q of questions" class="card mb-3">
-  <div class="card-body">
-    <p>{{ q.questionText }}</p>
-    <a [routerLink]="['/classroom', q.questionId]"
-       class="btn btn-primary btn-sm">
-      Answer
-    </a>
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
+
+.create-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.form-label {
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+.form-control {
+  border: 2px solid #e9ecef;
+  border-radius: 16px;
+  padding: 1rem;
+  font-size: 1rem;
+  resize: vertical;
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15);
+}
+
+.form-control.is-invalid {
+  border-color: #dc3545;
+}
+
+.counter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.text-success {
+  color: #198754 !important;
+}
+
+.text-danger {
+  color: #dc3545 !important;
+}
+
+.error-messages {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f8d7da;
+  border-radius: 12px;
+  color: #842029;
+  font-size: 0.9rem;
+}
+
+.tips-card {
+  background: linear-gradient(135deg, #fff3cd 0%, #fff8e7 100%);
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid #ffe69c;
+}
+
+.tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tips-list li {
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  color: #664d03;
+}
+
+.tips-list li:last-child {
+  margin-bottom: 0;
+}
+
+.btn-primary {
+  background: #0d6efd;
+  border: none;
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0b5ed7;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(13,110,253,0.3);
+}
+
+.btn-outline-secondary {
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #6c757d;
+  color: #6c757d;
+  transition: all 0.2s;
+}
+
+.btn-outline-secondary:hover {
+  background: #6c757d;
+  color: white;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .create-container {
+    padding: 1rem;
+  }
+
+  .create-card {
+    padding: 1.5rem;
+  }
+
+  .display-6 {
+    font-size: 1.5rem;
+  }
+}
+
+================================================================================
+File: src\app\classroom\create-question.component.html
+Size: 7.04 kB
+================================================================================
+
+<div class="create-container">
+  <!-- Header -->
+  <div class="d-flex align-items-center mb-4">
+    <button class="back-link" (click)="goBack()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back
+    </button>
+    <h1 class="display-6 fw-bold text-primary ms-3 mb-0">
+      <i class="bi bi-plus-circle me-2"></i>Create Question
+    </h1>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="create-card">
+        <!-- Loading State -->
+        <div *ngIf="loadingSubjects" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading subjects...</span>
+          </div>
+          <p class="mt-3 text-secondary">Loading your subjects...</p>
+        </div>
+
+        <!-- No Subjects Warning -->
+        <div *ngIf="!loadingSubjects && subjects.length === 0" class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          You don't have any subjects yet. 
+          <a routerLink="/classroom/subjects" class="alert-link">Create a subject first</a> before creating questions.
+        </div>
+
+        <!-- Create Question Form -->
+        <form *ngIf="!loadingSubjects && subjects.length > 0" [formGroup]="form" (ngSubmit)="onSubmit()">
+          <!-- Subject Selection -->
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-book text-primary me-2"></i>
+              Subject <span class="text-danger">*</span>
+            </label>
+            <select class="form-select" formControlName="subjectId"
+                    [ngClass]="{ 'is-invalid': submitted && f.subjectId.errors }">
+              <option value="">-- Select a subject --</option>
+              <option *ngFor="let subject of subjects" [value]="subject.subjectId">
+                {{ subject.subjectName }} ({{ subject.subjectCode }})
+              </option>
+            </select>
+            <div *ngIf="submitted && f.subjectId.errors" class="invalid-feedback">
+              Please select a subject
+            </div>
+            <div *ngIf="subjectId && subjects.length > 0" class="text-info mt-1">
+              <i class="bi bi-info-circle me-1"></i>
+              Creating question for: {{ getSelectedSubjectName() }}
+            </div>
+          </div>
+
+          <!-- Question Input -->
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-question-circle text-primary me-2"></i>
+              Question <span class="text-danger">*</span>
+            </label>
+            <textarea
+              class="form-control"
+              rows="5"
+              formControlName="questionText"
+              placeholder="Enter your question here... Be clear and specific..."
+              [ngClass]="{ 'is-invalid': submitted && f.questionText.errors }">
+            </textarea>
+
+            <!-- Character Counter -->
+            <div class="counter mt-2">
+              <small class="text-secondary">
+                <i class="bi bi-info-circle me-1"></i>
+                Minimum 10 characters
+              </small>
+              <small [class.text-danger]="(form.get('questionText')?.value?.length || 0) > 500"
+                     [class.text-success]="(form.get('questionText')?.value?.length || 0) <= 500">
+                {{ form.get('questionText')?.value?.length || 0 }}/500
+              </small>
+            </div>
+
+            <!-- Validation Errors -->
+            <div *ngIf="submitted && f.questionText.errors" class="error-messages">
+              <div *ngIf="f.questionText.errors.required">
+                <i class="bi bi-exclamation-circle me-1"></i>
+                Question is required
+              </div>
+              <div *ngIf="f.questionText.errors.minlength">
+                <i class="bi bi-exclamation-circle me-1"></i>
+                Question must be at least 10 characters
+              </div>
+              <div *ngIf="f.questionText.errors.maxlength">
+                <i class="bi bi-exclamation-circle me-1"></i>
+                Question cannot exceed 500 characters
+              </div>
+            </div>
+          </div>
+
+          <!-- Optional Fields -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <label class="form-label">
+                <i class="bi bi-calendar text-primary me-2"></i>
+                Due Date (Optional)
+              </label>
+              <input type="datetime-local" class="form-control" formControlName="dueDate">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">
+                <i class="bi bi-star text-primary me-2"></i>
+                Points (Optional)
+              </label>
+              <input type="number" class="form-control" formControlName="points" min="0" max="1000">
+            </div>
+          </div>
+
+          <!-- Tips Section -->
+          <div class="tips-card mb-4">
+            <h6 class="mb-3">
+              <i class="bi bi-lightbulb text-warning me-2"></i>
+              Tips for creating good questions
+            </h6>
+            <ul class="tips-list mb-0">
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Be clear and specific
+              </li>
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Provide context if needed
+              </li>
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Avoid ambiguous language
+              </li>
+              <li>
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                Break complex questions into parts
+              </li>
+            </ul>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="d-flex gap-3">
+            <button type="submit" 
+                    [disabled]="submitting || loadingSubjects" 
+                    class="btn btn-primary flex-grow-1">
+              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2"></span>
+              <i *ngIf="!submitting" class="bi bi-send me-2"></i>
+              {{ submitting ? 'Creating...' : 'Create Question' }}
+            </button>
+            
+            <button type="button" class="btn btn-outline-secondary" (click)="goBack()">
+              <i class="bi bi-x-circle me-2"></i>
+              Cancel
+            </button>
+          </div>
+        </form>
+
+        <!-- Alternative for no subjects -->
+        <div *ngIf="!loadingSubjects && subjects.length === 0" class="text-center py-4">
+          <a routerLink="/classroom/subjects" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Create Subject First
+          </a>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-<div *ngIf="!loading && questions.length === 0"
-     class="alert alert-info">
-  No questions available.
+================================================================================
+File: src\app\classroom\create-question.component.ts
+Size: 5.57 kB
+================================================================================
+
+import { Component, OnInit } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { first } from 'rxjs/operators';
+import { environment } from '@environments/environment';
+import { AlertService } from '@app/_services';
+import { SubjectService } from '@app/_services/subject.service';
+
+@Component({
+  selector: 'app-create-question',
+  templateUrl: './create-question.component.html',
+  styleUrls: ['./create-question.component.css']
+})
+export class CreateQuestionComponent implements OnInit {
+  form!: FormGroup;
+  subjects: any[] = [];
+  submitting = false;
+  submitted = false;
+  subjectId: number | null = null;
+  loadingSubjects = true;
+
+  constructor(
+    private formBuilder: FormBuilder,
+    private router: Router,
+    private route: ActivatedRoute,
+    private http: HttpClient,
+    private alertService: AlertService,
+    private subjectService: SubjectService
+  ) { }
+
+  ngOnInit() {
+    // Check if subjectId is passed in query params
+    this.route.queryParams.subscribe(params => {
+      this.subjectId = params['subjectId'] ? Number(params['subjectId']) : null;
+      console.log('SubjectId from URL:', this.subjectId); // Debug log
+    });
+
+    this.form = this.formBuilder.group({
+      subjectId: [this.subjectId || '', Validators.required],
+      questionText: ['', [
+        Validators.required,
+        Validators.minLength(10),
+        Validators.maxLength(500)
+      ]],
+      dueDate: [''],
+      points: [100]
+    });
+
+    this.loadSubjects();
+  }
+
+  loadSubjects() {
+    this.loadingSubjects = true;
+    console.log('Loading subjects...'); // Debug log
+    
+    this.subjectService.getMySubjects()
+      .pipe(first())
+      .subscribe({
+        next: (subjects: any[]) => {
+          console.log('Loaded subjects:', subjects); // Debug log
+          this.subjects = subjects;
+          this.loadingSubjects = false;
+          
+          // If we have a subjectId from URL and subjects are loaded, set it
+          if (this.subjectId && subjects.length > 0) {
+            const subjectExists = subjects.some(s => s.subjectId === this.subjectId);
+            if (subjectExists) {
+              this.form.patchValue({ subjectId: this.subjectId });
+              console.log('Set subjectId from URL:', this.subjectId);
+            }
+          }
+          
+          if (subjects.length === 0) {
+            this.alertService.warn('You need to create a subject first before creating questions.');
+          }
+        },
+        error: (error: any) => {
+          console.error('Error loading subjects:', error);
+          this.alertService.error('Failed to load subjects');
+          this.loadingSubjects = false;
+        }
+      });
+  }
+
+  // convenience getter for easy access to form fields
+  get f() { return this.form.controls; }
+
+  // Add this method to get the selected subject name for display
+  getSelectedSubjectName(): string {
+    const selectedId = this.form?.get('subjectId')?.value;
+    if (!selectedId) return '';
+    
+    const subject = this.subjects.find(s => s.subjectId === Number(selectedId));
+    return subject ? subject.subjectName : '';
+  }
+
+onSubmit() {
+  this.submitted = true;
+
+  // stop here if form is invalid
+  if (this.form.invalid) {
+    console.log('Form invalid:', this.form.errors);
+    console.log('Form values:', this.form.value);
+    return;
+  }
+
+  // Double-check subjectId is present
+  const formValue = this.form.value;
+  console.log('Raw form value:', formValue);
+  console.log('SubjectId value:', formValue.subjectId);
+  console.log('SubjectId type:', typeof formValue.subjectId);
+
+  if (!formValue.subjectId) {
+    console.error('SubjectId is missing from form');
+    this.alertService.error('Please select a subject');
+    return;
+  }
+
+  this.submitting = true;
+  
+  // Make sure subjectId is a number
+  const requestData = {
+    questionText: formValue.questionText,
+    subjectId: Number(formValue.subjectId), // Force convert to number
+    dueDate: formValue.dueDate || null,
+    points: formValue.points || 100
+  };
+  
+  console.log('Final request data being sent:', requestData);
+  
+  this.http.post<any>(`${environment.apiUrl}/classroom/questions`, requestData)
+    .pipe(first())
+    .subscribe({
+      next: (response) => {
+        console.log('Question created successfully:', response);
+        this.alertService.success('Question created successfully', { keepAfterRouteChange: true });
+        
+        // Navigate back to subject
+        const selectedSubjectId = requestData.subjectId;
+        if (selectedSubjectId) {
+          this.router.navigate(['/classroom/subject', selectedSubjectId]);
+        } else {
+          this.router.navigate(['/classroom/subjects']);
+        }
+      },
+      error: (error: any) => {
+        console.error('Error creating question:', error);
+        
+        // Log the full error response
+        if (error.error) {
+          console.error('Error details from server:', error.error);
+        }
+        
+        this.alertService.error(error.message || error || 'Failed to create question');
+        this.submitting = false;
+      }
+    });
+}
+
+  goBack() {
+    if (this.subjectId) {
+      this.router.navigate(['/classroom/subject', this.subjectId]);
+    } else {
+      this.router.navigate(['/classroom/subjects']);
+    }
+  }
+}
+
+================================================================================
+File: src\app\classroom\list\list.component.css
+Size: 2.43 kB
+================================================================================
+
+.classroom-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.info-banner {
+  background: #e7f1ff;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  color: #084298;
+  border-left: 4px solid #0d6efd;
+}
+
+.card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(13,110,253,0.15);
+  border-color: rgba(13,110,253,0.2);
+}
+
+.question-content {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.question-content::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to bottom, transparent, white);
+}
+
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.btn-outline-primary, .btn-outline-info {
+  border-width: 2px;
+  border-radius: 12px;
+  padding: 12px;
+  font-weight: 500;
+}
+
+.btn-outline-primary:hover, .btn-outline-info:hover {
+  transform: scale(1.02);
+}
+
+.empty-state-icon {
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .classroom-container {
+    padding: 1rem;
+  }
+  
+  .display-6 {
+    font-size: 1.75rem;
+  }
+  
+  .info-banner {
+    font-size: 0.9rem;
+  }
+}
+
+/* Add to your existing CSS */
+
+.answered-card {
+  opacity: 0.85;
+  border-left: 4px solid #198754 !important;
+}
+
+.btn-success {
+  background-color: #198754;
+  border-color: #198754;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #157347;
+  border-color: #146c43;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(25,135,84,0.3);
+}
+
+.disabled-btn {
+  cursor: not-allowed;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.btn-success i, .btn-outline-primary i {
+  margin-right: 0.5rem;
+}
+
+/* Tooltip style for answered questions */
+[disabled] {
+  position: relative;
+}
+
+[disabled]:hover::after {
+  content: 'You have already answered this question';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-bottom: 5px;
+  z-index: 1000;
+}
+
+.badge.bg-success {
+  background-color: #198754 !important;
+  color: white;
+  font-size: 0.75rem;
+}
+
+================================================================================
+File: src\app\classroom\list\list.component.html
+Size: 5.29 kB
+================================================================================
+
+<div class="classroom-container">
+  <!-- Header Section -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="display-6 fw-bold text-primary mb-2">
+        <i class="bi bi-question-circle-fill me-2"></i>All Questions
+      </h1>
+      <p class="text-secondary">
+        Browse all questions from all subjects
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <a routerLink="/classroom/subjects" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left me-2"></i>Back to Subjects
+      </a>
+      <button class="btn btn-outline-secondary" (click)="refreshQuestions()" [disabled]="loading">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Subject Filter -->
+  <div class="mb-4">
+    <select class="form-select" style="width: auto; display: inline-block;" (change)="filterBySubject($event)">
+      <option value="all">All Subjects</option>
+      <option *ngFor="let subject of subjects" [value]="subject.subjectId">
+        {{ subject.subjectName }} ({{ subject.subjectCode }})
+      </option>
+    </select>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-secondary">Loading questions...</p>
+  </div>
+
+  <!-- Questions Grid -->
+  <div *ngIf="!loading && filteredQuestions.length > 0" class="row g-4">
+    <div *ngFor="let q of filteredQuestions" class="col-md-6 col-lg-4">
+      <div class="card h-100" [ngClass]="{'answered-card': isStudent() && q.hasAnswered}">
+        <div class="card-body">
+          <!-- Question Header -->
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
+              <i class="bi bi-question-circle-fill me-1"></i>Question
+            </span>
+            <div class="d-flex align-items-center gap-2">
+              <span *ngIf="isStudent() && q.hasAnswered" class="badge bg-success px-3 py-2 rounded-pill">
+                <i class="bi bi-check-circle-fill me-1"></i>Answered
+              </span>
+              <small class="text-secondary">
+                <i class="bi bi-clock me-1"></i>{{ q.createdAt | date:'short' }}
+              </small>
+            </div>
+          </div>
+
+          <!-- Subject Info -->
+          <div class="mb-2">
+            <span class="badge bg-info bg-opacity-10 text-info px-2 py-1 rounded-pill">
+              <i class="bi bi-book me-1"></i>{{ q.subjectName || 'General' }} ({{ q.subjectCode || 'GEN101' }})
+            </span>
+          </div>
+
+          <!-- Question Content -->
+          <div class="question-content mb-3">
+            <p class="card-text">{{ q.questionText }}</p>
+          </div>
+
+          <!-- Teacher Info -->
+          <div class="d-flex align-items-center mb-3">
+            <i class="bi bi-person-circle text-primary me-2"></i>
+            <span class="text-secondary small">
+              By: <strong>{{ q.teacherName || 'Teacher' }}</strong>
+            </span>
+          </div>
+
+          <!-- Action Button -->
+          <div class="d-grid">
+            <ng-container *ngIf="isStudent()">
+              <button (click)="navigateToQuestion(q)" 
+                      [disabled]="q.hasAnswered"
+                      class="btn btn-lg"
+                      [ngClass]="{
+                        'btn-outline-primary': !q.hasAnswered,
+                        'btn-success': q.hasAnswered
+                      }">
+                <i class="bi me-2" [ngClass]="{
+                  'bi-pencil-square': !q.hasAnswered,
+                  'bi-check-circle-fill': q.hasAnswered
+                }"></i>
+                {{ q.hasAnswered ? 'Already Answered' : 'Answer Question' }}
+              </button>
+            </ng-container>
+            
+            <ng-container *ngIf="isTeacher()">
+              <button (click)="viewAnswers(q)" class="btn btn-outline-info btn-lg">
+                <i class="bi bi-eye me-2"></i>View Answers
+              </button>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && filteredQuestions.length === 0" class="text-center py-5">
+    <div class="empty-state-icon mb-4">
+      <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
+    </div>
+    <h3 class="h4 text-secondary mb-3">No Questions Found</h3>
+    
+    <ng-container *ngIf="isTeacher()">
+      <p class="text-secondary mb-4">Create your first question</p>
+      <a routerLink="/classroom/create" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-2"></i>Create Question
+      </a>
+    </ng-container>
+    
+    <ng-container *ngIf="isStudent()">
+      <p class="text-secondary mb-4">Check back later for new questions</p>
+      <button class="btn btn-primary" (click)="refreshQuestions()">
+        <i class="bi bi-arrow-clockwise me-2"></i>Refresh
+      </button>
+    </ng-container>
+  </div>
 </div>
 
 ================================================================================
 File: src\app\classroom\list\list.component.ts
-Size: 578 B
+Size: 3.12 kB
 ================================================================================
 
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { environment } from '@environments/environment';
+import { AccountService, AlertService, SubjectService } from '@app/_services'; // Import from _services
+import { Account } from '@app/_models';
+import { first } from 'rxjs/operators';
 
 @Component({
-  templateUrl: './list.component.html'
+  selector: 'app-list', // Add selector
+  templateUrl: './list.component.html',
+  styleUrls: ['./list.component.css']
 })
 export class ListComponent implements OnInit {
+  questions: any[] = [];
+  filteredQuestions: any[] = [];
+  subjects: any[] = [];
+  loading = true;
+  account: Account | null;
+  selectedSubjectId: string = 'all';
 
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private accountService: AccountService,
+    private subjectService: SubjectService,
+    private alertService: AlertService
+  ) {
+    this.account = this.accountService.accountValue;
+  }
+
+  ngOnInit() {
+    this.loadSubjects();
+    this.loadQuestions();
+  }
+
+  loadSubjects() {
+    this.subjectService.getAll()
+      .pipe(first())
+      .subscribe({
+        next: (subjects: any[]) => {
+          this.subjects = subjects;
+        },
+        error: (error: any) => {
+          console.error('Error loading subjects:', error);
+        }
+      });
+  }
+
+  loadQuestions() {
+    this.loading = true;
+    this.http.get<any[]>(`${environment.apiUrl}/classroom/questions`)
+      .subscribe({
+        next: (data: any[]) => {
+          this.questions = data;
+          this.applyFilter();
+          this.loading = false;
+        },
+        error: (err: any) => {
+          console.error('Error loading questions:', err);
+          this.alertService.error('Failed to load questions');
+          this.loading = false;
+        }
+      });
+  }
+
+  filterBySubject(event: any) {
+    this.selectedSubjectId = event.target.value;
+    this.applyFilter();
+  }
+
+  applyFilter() {
+    if (this.selectedSubjectId === 'all') {
+      this.filteredQuestions = this.questions;
+    } else {
+      this.filteredQuestions = this.questions.filter(q => 
+        q.subjectId == this.selectedSubjectId
+      );
+    }
+  }
+
+  hasUserAnswered(question: any): boolean {
+    return question.hasAnswered || false;
+  }
+
+  isTeacher(): boolean {
+    return this.account?.role === 'Teacher' || this.account?.role === 'Admin';
+  }
+
+  isStudent(): boolean {
+    return this.account?.role === 'Student' || this.account?.role === 'User';
+  }
+
+  navigateToQuestion(question: any) {
+    if (this.isStudent() && question.hasAnswered) {
+      this.alertService.info('You have already answered this question');
+      return;
+    }
+    
+    this.router.navigate(['/classroom', question.questionId], {
+      state: { question: question }
+    });
+  }
+
+  viewAnswers(question: any) {
+    this.router.navigate(['/classroom/view', question.questionId], {
+      state: { question: question }
+    });
+  }
+
+  refreshQuestions() {
+    this.loadQuestions();
+  }
+}
+
+================================================================================
+File: src\app\classroom\my-questions.component.css
+Size: 1.53 kB
+================================================================================
+
+.my-questions-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.question-item {
+  margin-bottom: 1rem;
+  animation: slideIn 0.3s ease;
+}
+
+.question-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.2s;
+}
+
+.question-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.question-text {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #212529;
+}
+
+.badge {
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  font-weight: 500;
+}
+
+.stats .badge {
+  background: #e7f1ff;
+  color: #0d6efd;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  border-radius: 30px;
+  font-size: 0.9rem;
+}
+
+.btn-outline-primary {
+  border: 2px solid #0d6efd;
+  color: #0d6efd;
+}
+
+.btn-outline-primary:hover {
+  background: #0d6efd;
+  color: white;
+}
+
+.btn-outline-danger {
+  border: 2px solid #dc3545;
+  color: #dc3545;
+}
+
+.btn-outline-danger:hover {
+  background: #dc3545;
+  color: white;
+}
+
+.empty-state {
+  opacity: 0.7;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .my-questions-container {
+    padding: 1rem;
+  }
+
+  .display-6 {
+    font-size: 1.8rem;
+  }
+
+  .question-card {
+    padding: 1rem;
+  }
+
+  .question-text {
+    font-size: 1rem;
+  }
+}
+
+================================================================================
+File: src\app\classroom\my-questions.component.html
+Size: 2.49 kB
+================================================================================
+
+<div class="my-questions-container">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="display-6 fw-bold text-primary mb-2">
+        <i class="bi bi-journal-bookmark-fill me-2"></i>My Questions
+      </h1>
+      <p class="text-secondary">Questions you've created</p>
+    </div>
+    <a routerLink="/classroom/create" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-2"></i>Create New
+    </a>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-secondary">Loading your questions...</p>
+  </div>
+
+  <!-- Questions List -->
+  <div *ngIf="!loading && questions.length > 0" class="questions-list">
+    <div *ngFor="let question of questions" class="question-item">
+      <div class="question-card">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <span class="badge bg-primary">
+            <i class="bi bi-question-circle me-1"></i>
+            Question #{{question.questionId}}
+          </span>
+        </div>
+
+        <p class="question-text mb-3">{{ question.questionText }}</p>
+
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="stats">
+            <span class="badge bg-info me-2">
+              <i class="bi bi-people me-1"></i>
+              {{ question.answerCount || 0 }} Answers
+            </span>
+          </div>
+
+          <div class="actions">
+           
+            <button class="btn btn-sm btn-outline-danger" 
+                    (click)="deleteQuestion(question.questionId)">
+              <i class="bi bi-trash me-1"></i>Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && questions.length === 0" class="text-center py-5">
+    <div class="empty-state mb-4">
+      <i class="bi bi-journal-x" style="font-size: 4rem; color: #dee2e6;"></i>
+    </div>
+    <h3 class="h4 text-secondary mb-3">No Questions Yet</h3>
+    <p class="text-secondary mb-4">Start by creating your first question</p>
+    <a routerLink="/classroom/create" class="btn btn-primary btn-lg">
+      <i class="bi bi-plus-circle me-2"></i>Create Question
+    </a>
+  </div>
+</div>
+
+================================================================================
+File: src\app\classroom\my-questions.component.ts
+Size: 1.51 kB
+================================================================================
+
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '@environments/environment';
+import { AlertService } from '@app/_services';
+import { first } from 'rxjs/operators';
+
+@Component({
+  templateUrl: './my-questions.component.html',
+  styleUrls: ['./my-questions.component.css']
+})
+export class MyQuestionsComponent implements OnInit {
   questions: any[] = [];
   loading = true;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private alertService: AlertService
+  ) {}
 
   ngOnInit() {
-    this.http.get<any[]>('http://localhost:4000/classroom/questions')
+    this.loadMyQuestions();
+  }
+
+  loadMyQuestions() {
+    this.loading = true;
+    this.http.get<any[]>(`${environment.apiUrl}/classroom/my-questions`)
       .subscribe({
         next: data => {
           this.questions = data;
           this.loading = false;
         },
-        error: () => this.loading = false
+        error: err => {
+          console.error('Error loading questions:', err);
+          this.loading = false;
+        }
       });
+  }
+
+  deleteQuestion(questionId: number) {
+    if (confirm('Are you sure you want to delete this question?')) {
+      this.http.delete(`${environment.apiUrl}/classroom/questions/${questionId}`)
+        .pipe(first())
+        .subscribe({
+          next: () => {
+            this.alertService.success('Question deleted successfully');
+            this.loadMyQuestions();
+          },
+          error: error => {
+            this.alertService.error(error);
+          }
+        });
+    }
+  }
+}
+
+================================================================================
+File: src\app\classroom\subject-view\subject-view.component.css
+Size: 2.22 kB
+================================================================================
+
+.subject-view-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
+
+.subject-header-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.stats-box {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 16px;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #0d6efd;
+  margin-right: 0.5rem;
+}
+
+.stat-label {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.nav-tabs {
+  border-bottom: 2px solid #e9ecef;
+}
+
+.nav-tabs .nav-link {
+  border: none;
+  color: #6c757d;
+  font-weight: 500;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+}
+
+.nav-tabs .nav-link.active {
+  color: #0d6efd;
+  background: none;
+  border-bottom: 2px solid #0d6efd;
+}
+
+.question-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.2s;
+}
+
+.question-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.question-text {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #212529;
+}
+
+.table {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.table thead th {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e9ecef;
+  color: #495057;
+  font-weight: 600;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+}
+
+.empty-state {
+  opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .subject-view-container {
+    padding: 1rem;
+  }
+  
+  .subject-header-card {
+    padding: 1.5rem;
+  }
+  
+  .stats-box {
+    margin-top: 1rem;
+    text-align: left !important;
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .nav-tabs .nav-link {
+    padding: 0.75rem 1rem;
+  }
+}
+
+================================================================================
+File: src\app\classroom\subject-view\subject-view.component.html
+Size: 8.43 kB
+================================================================================
+
+<div class="subject-view-container">
+  <!-- Header with Back Button -->
+  <div class="mb-4">
+    <button class="back-link" (click)="goBack()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to Subjects
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-secondary">Loading subject details...</p>
+  </div>
+
+  <div *ngIf="!loading && subject">
+    <!-- Subject Header -->
+    <div class="subject-header-card mb-4">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <div class="d-flex align-items-center mb-2">
+            <span class="badge bg-primary me-3">{{ subject.subjectCode }}</span>
+            <h1 class="h2 mb-0">{{ subject.subjectName }}</h1>
+          </div>
+          <p class="text-secondary mb-2">{{ subject.description || 'No description' }}</p>
+          <div class="d-flex flex-wrap gap-3">
+            <span class="text-secondary">
+              <i class="bi bi-person-circle me-2"></i>
+              Teacher: <strong>{{ subject.teacherName || 'Unknown' }}</strong>
+            </span>
+            <span *ngIf="subject.schedule" class="text-secondary">
+              <i class="bi bi-clock me-2"></i>{{ subject.schedule }}
+            </span>
+            <span *ngIf="subject.room" class="text-secondary">
+              <i class="bi bi-door-open me-2"></i>Room {{ subject.room }}
+            </span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stats-box text-end">
+            <div class="mb-2">
+              <span class="stat-value">{{ subject.studentCount || 0 }}</span>
+              <span class="stat-label">Students</span>
+            </div>
+            <div>
+              <span class="stat-value">{{ subject.questionCount || 0 }}</span>
+              <span class="stat-label">Questions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'questions'" (click)="setActiveTab('questions')">
+          <i class="bi bi-question-circle me-2"></i>Questions
+        </a>
+      </li>
+      <li *ngIf="isTeacher()" class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'students'" (click)="setActiveTab('students')">
+          <i class="bi bi-people me-2"></i>Students
+        </a>
+      </li>
+    </ul>
+
+    <!-- Questions Tab -->
+    <div *ngIf="activeTab === 'questions'">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="h4 mb-0">Subject Questions</h3>
+        <ng-container *ngIf="isTeacher()">
+          <a [routerLink]="['/classroom/create']" [queryParams]="{subjectId: subject?.subjectId}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Create Question
+          </a>
+        </ng-container>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loadingQuestions" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Questions List -->
+      <div *ngIf="!loadingQuestions && questions.length > 0" class="questions-list">
+        <div *ngFor="let question of questions" class="question-item mb-3">
+          <div class="question-card">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
+                <i class="bi bi-question-circle-fill me-1"></i>Question
+              </span>
+              <small class="text-secondary">
+                <i class="bi bi-clock me-1"></i>{{ question.createdAt | date:'medium' }}
+              </small>
+            </div>
+
+            <p class="question-text mb-3">{{ question.questionText }}</p>
+
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-person-circle text-primary me-2"></i>
+                <span class="text-secondary small">By: {{ question.teacherName || 'Teacher' }}</span>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="d-flex gap-2">
+                <ng-container *ngIf="isStudent()">
+                  <button *ngIf="!question.hasAnswered" 
+                          class="btn btn-outline-primary btn-sm"
+                          (click)="answerQuestion(question)">
+                    <i class="bi bi-pencil-square me-1"></i>Answer
+                  </button>
+                  <span *ngIf="question.hasAnswered" 
+                        class="badge bg-success px-3 py-2 rounded-pill">
+                    <i class="bi bi-check-circle-fill me-1"></i>Answered
+                  </span>
+                </ng-container>
+                
+                <ng-container *ngIf="isTeacher()">
+                  <button class="btn btn-outline-info btn-sm"
+                          (click)="viewAnswers(question)">
+                    <i class="bi bi-eye me-1"></i>View Answers
+                  </button>
+                </ng-container>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- No Questions State -->
+      <div *ngIf="!loadingQuestions && questions.length === 0" class="text-center py-5">
+        <div class="empty-state mb-4">
+          <i class="bi bi-question-circle" style="font-size: 4rem; color: #dee2e6;"></i>
+        </div>
+        <h4 class="h5 text-secondary mb-3">No Questions Yet</h4>
+        <ng-container *ngIf="isTeacher()">
+          <p class="text-secondary mb-4">Create your first question for this subject</p>
+          <a [routerLink]="['/classroom/create']" [queryParams]="{subjectId: subject?.subjectId}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Create Question
+          </a>
+        </ng-container>
+        <ng-container *ngIf="isStudent()">
+          <p class="text-secondary mb-4">Check back later for questions from your teacher</p>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Students Tab (Teacher Only) -->
+    <div *ngIf="activeTab === 'students' && isTeacher()">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="h4 mb-0">Enrolled Students</h3>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loadingStudents" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Students List -->
+      <div *ngIf="!loadingStudents && students.length > 0" class="students-list">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Enrolled Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let enrollment of students">
+                <td class="align-middle">
+                  <i class="bi bi-person-circle me-2"></i>
+                  {{ enrollment.student?.firstName }} {{ enrollment.student?.lastName }}
+                </td>
+                <td class="align-middle">{{ enrollment.student?.email }}</td>
+                <td class="align-middle">{{ enrollment.enrolledAt | date:'mediumDate' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- No Students State -->
+      <div *ngIf="!loadingStudents && students.length === 0" class="text-center py-5">
+        <div class="empty-state mb-4">
+          <i class="bi bi-people" style="font-size: 4rem; color: #dee2e6;"></i>
+        </div>
+        <h4 class="h5 text-secondary mb-3">No Students Enrolled</h4>
+        <p class="text-secondary mb-4">Students will appear here once they enroll</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+================================================================================
+File: src\app\classroom\subject-view\subject-view.component.ts
+Size: 3.46 kB
+================================================================================
+
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { first } from 'rxjs/operators';
+import { SubjectService } from '@app/_services/subject.service';
+import { AccountService, AlertService } from '@app/_services';
+import { Account } from '@app/_models';
+
+@Component({
+  templateUrl: './subject-view.component.html',
+  styleUrls: ['./subject-view.component.css']
+})
+export class SubjectViewComponent implements OnInit {
+  subjectId!: number;
+  subject: any = null;
+  questions: any[] = [];
+  students: any[] = [];
+  account: Account | null;
+  
+  activeTab: 'questions' | 'students' = 'questions';
+  
+  loading = true;
+  loadingQuestions = true;
+  loadingStudents = true;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private subjectService: SubjectService,
+    private accountService: AccountService,
+    private alertService: AlertService
+  ) {
+    this.account = this.accountService.accountValue;
+  }
+
+  ngOnInit() {
+    this.subjectId = Number(this.route.snapshot.paramMap.get('id'));
+    
+    // Try to get from state
+    const state = history.state;
+    if (state && state.subject) {
+      this.subject = state.subject;
+    }
+    
+    this.loadSubject();
+    this.loadQuestions();
+    
+    if (this.isTeacher()) {
+      this.loadStudents();
+    }
+  }
+
+  loadSubject() {
+    this.loading = true;
+    this.subjectService.getById(this.subjectId)
+      .pipe(first())
+      .subscribe({
+        next: (subject: any) => {
+          this.subject = subject;
+          this.loading = false;
+        },
+        error: (error: any) => {
+          this.alertService.error(error);
+          this.loading = false;
+        }
+      });
+  }
+
+  loadQuestions() {
+    this.loadingQuestions = true;
+    this.subjectService.getSubjectQuestions(this.subjectId)
+      .pipe(first())
+      .subscribe({
+        next: (questions: any[]) => {
+          this.questions = questions;
+          this.loadingQuestions = false;
+        },
+        error: (error: any) => {
+          this.alertService.error(error);
+          this.loadingQuestions = false;
+        }
+      });
+  }
+
+  loadStudents() {
+    this.loadingStudents = true;
+    this.subjectService.getStudents(this.subjectId)
+      .pipe(first())
+      .subscribe({
+        next: (students: any[]) => {
+          this.students = students;
+          this.loadingStudents = false;
+        },
+        error: (error: any) => {
+          this.alertService.error(error);
+          this.loadingStudents = false;
+        }
+      });
+  }
+
+  setActiveTab(tab: 'questions' | 'students') {
+    this.activeTab = tab;
+  }
+
+  isTeacher(): boolean {
+    return this.account?.role === 'Teacher' || this.account?.role === 'Admin';
+  }
+
+  isStudent(): boolean {
+    return this.account?.role === 'Student' || this.account?.role === 'User';
+  }
+
+  goBack() {
+    this.router.navigate(['/classroom/subjects']);
+  }
+
+  answerQuestion(question: any) {
+    this.router.navigate(['/classroom', question.questionId], {
+      state: { question: question, subject: this.subject }
+    });
+  }
+
+  viewAnswers(question: any) {
+    this.router.navigate(['/classroom/view', question.questionId], {
+      state: { question: question, subject: this.subject }
+    });
+  }
+}
+
+================================================================================
+File: src\app\classroom\subjects\subjects.component.css
+Size: 1.73 kB
+================================================================================
+
+.subjects-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.subject-card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.subject-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(13,110,253,0.15);
+}
+
+/* Enrolled card specific styles */
+.subject-card.enrolled {
+  border-left: 4px solid #198754;
+  background: linear-gradient(to right, rgba(25, 135, 84, 0.02), transparent);
+}
+
+.subject-card.enrolled:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(25, 135, 84, 0.15);
+}
+
+.stats-row .badge {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Success badge for enrolled */
+.badge.bg-success {
+  background-color: #198754 !important;
+  color: white;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  color: #6c757d;
+}
+
+.btn-group {
+  border-radius: 30px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.btn-group .btn {
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  min-width: 150px; /* Added for consistent button width */
+}
+
+.empty-state-icon {
+  opacity: 0.7;
+}
+
+.modal-content {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  padding: 1.5rem;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .subjects-container {
+    padding: 1rem;
+  }
+  
+  .display-6 {
+    font-size: 1.75rem;
+  }
+  
+  .btn-group .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    min-width: 120px; /* Adjusted for mobile */
+  }
+}
+
+================================================================================
+File: src\app\classroom\subjects\subjects.component.html
+Size: 10.56 kB
+================================================================================
+
+<div class="subjects-container">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="display-6 fw-bold text-primary mb-2">
+        <i class="bi bi-book-fill me-2"></i>My Subjects
+      </h1>
+      <p class="text-secondary">
+        {{ isTeacher() ? 'Manage your subjects' : 'Browse and enroll in subjects' }}
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <!-- Link to view all questions -->
+      <a routerLink="/classroom/all-questions" class="btn btn-outline-info">
+        <i class="bi bi-question-circle me-2"></i>All Questions
+      </a>
+      
+      <!-- Teacher/Admin Actions -->
+      <ng-container *ngIf="isTeacher()">
+        <button class="btn btn-primary" (click)="openCreateSubjectModal()">
+          <i class="bi bi-plus-circle me-2"></i>Create Subject
+        </button>
+      </ng-container>
+      
+      <!-- Refresh Button -->
+      <button class="btn btn-outline-secondary" (click)="loadSubjects()" [disabled]="loading">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- View Toggle for Students -->
+  <div *ngIf="isStudent()" class="mb-4">
+    <div class="btn-group" role="group">
+      <button class="btn" [class.btn-primary]="viewMode === 'enrolled'" 
+              [class.btn-outline-primary]="viewMode !== 'enrolled'"
+              (click)="setViewMode('enrolled')">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        My Subjects ({{ getEnrolledCount() }})
+      </button>
+      <button class="btn" [class.btn-primary]="viewMode === 'available'" 
+              [class.btn-outline-primary]="viewMode !== 'available'"
+              (click)="setViewMode('available')">
+        <i class="bi bi-plus-circle me-2"></i>
+        Available Subjects ({{ getAvailableCount() }})
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-secondary">Loading subjects...</p>
+  </div>
+
+  <!-- Subjects Grid -->
+  <div *ngIf="!loading && filteredSubjects.length > 0" class="row g-4">
+    <div *ngFor="let subject of filteredSubjects" class="col-md-6 col-lg-4">
+      <div class="subject-card card h-100" [class.enrolled]="subject.isEnrolled">
+        <div class="card-body">
+          <!-- Subject Header -->
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <span class="badge" [ngClass]="subject.isEnrolled ? 'bg-success' : 'bg-primary'">
+              <i class="bi bi-book me-1"></i>{{ subject.subjectCode }}
+            </span>
+            <div class="d-flex align-items-center gap-2">
+              <!-- Enrolled Badge -->
+              <span *ngIf="subject.isEnrolled" class="badge bg-success px-3 py-2 rounded-pill">
+                <i class="bi bi-check-circle-fill me-1"></i>Enrolled
+              </span>
+              <small class="text-secondary">
+                <i class="bi bi-calendar me-1"></i>{{ subject.createdAt | date:'shortDate' }}
+              </small>
+              <!-- Edit button for teachers -->
+              <button *ngIf="isTeacher()" class="btn btn-sm btn-outline-secondary" 
+                      (click)="editSubject(subject)">
+                <i class="bi bi-pencil"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Subject Name -->
+          <h5 class="card-title mb-2">{{ subject.subjectName }}</h5>
+          
+          <!-- Description -->
+          <p class="card-text text-secondary small mb-3">{{ subject.description || 'No description' }}</p>
+
+          <!-- Teacher Info -->
+          <div class="d-flex align-items-center mb-3">
+            <i class="bi bi-person-circle text-primary me-2"></i>
+            <span class="text-secondary small">
+              Teacher: <strong>{{ subject.teacherName || 'Unknown' }}</strong>
+            </span>
+          </div>
+
+          <!-- Subject Details -->
+          <div class="subject-details mb-3">
+            <div *ngIf="subject.schedule" class="detail-item mb-2">
+              <i class="bi bi-clock text-secondary me-2"></i>
+              <small>{{ subject.schedule }}</small>
+            </div>
+            <div *ngIf="subject.room" class="detail-item mb-2">
+              <i class="bi bi-door-open text-secondary me-2"></i>
+              <small>Room {{ subject.room }}</small>
+            </div>
+          </div>
+
+          <!-- Stats Row -->
+          <div class="stats-row d-flex justify-content-between mb-3">
+            <span class="badge bg-info bg-opacity-10 text-info px-3 py-2 rounded-pill">
+              <i class="bi bi-people me-1"></i>{{ subject.studentCount || 0 }} Students
+            </span>
+            <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill">
+              <i class="bi bi-question-circle me-1"></i>{{ subject.questionCount || 0 }} Questions
+            </span>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="d-grid gap-2">
+            <!-- For Teachers -->
+            <ng-container *ngIf="isTeacher()">
+              <button class="btn btn-outline-primary" (click)="viewSubject(subject)">
+                <i class="bi bi-eye me-2"></i>Manage Subject
+              </button>
+            </ng-container>
+
+            <!-- For Students -->
+            <ng-container *ngIf="isStudent()">
+              <ng-container *ngIf="subject.isEnrolled">
+                <button class="btn btn-success" (click)="viewSubject(subject)">
+                  <i class="bi bi-box-arrow-in-right me-2"></i>Enter Classroom
+                </button>
+              </ng-container>
+              <ng-container *ngIf="!subject.isEnrolled && viewMode === 'available'">
+                <button class="btn btn-outline-primary" (click)="enrollSubject(subject)">
+                  <i class="bi bi-plus-circle me-2"></i>Enroll
+                </button>
+              </ng-container>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && filteredSubjects.length === 0" class="text-center py-5">
+    <div class="empty-state-icon mb-4">
+      <i class="bi bi-journal-x" style="font-size: 4rem; color: #dee2e6;"></i>
+    </div>
+    <h3 class="h4 text-secondary mb-3">
+      {{ isStudent() && viewMode === 'enrolled' ? 'No Enrolled Subjects' : 'No Subjects Found' }}
+    </h3>
+    
+    <ng-container *ngIf="isTeacher()">
+      <p class="text-secondary mb-4">Create your first subject to get started</p>
+      <button class="btn btn-primary" (click)="openCreateSubjectModal()">
+        <i class="bi bi-plus-circle me-2"></i>Create Subject
+      </button>
+    </ng-container>
+    
+    <ng-container *ngIf="isStudent()">
+      <p class="text-secondary mb-4" *ngIf="viewMode === 'enrolled'">
+        You haven't enrolled in any subjects yet. 
+        <a href="javascript:void(0)" (click)="setViewMode('available')">Browse available subjects</a> to get started.
+      </p>
+      <p class="text-secondary mb-4" *ngIf="viewMode === 'available'">
+        No subjects available for enrollment at the moment.
+      </p>
+      <button class="btn btn-primary" (click)="loadSubjects()">
+        <i class="bi bi-arrow-clockwise me-2"></i>Refresh
+      </button>
+    </ng-container>
+  </div>
+</div>
+
+<!-- Create/Edit Subject Modal -->
+<div class="modal fade" id="subjectModal" tabindex="-1" aria-labelledby="subjectModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="subjectModalLabel">{{ modalTitle }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="subjectForm" (ngSubmit)="saveSubject()">
+          <div class="mb-3">
+            <label class="form-label">Subject Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" formControlName="subjectName"
+                   [ngClass]="{ 'is-invalid': submitted && f.subjectName.errors }">
+            <div *ngIf="submitted && f.subjectName.errors" class="invalid-feedback">
+              Subject name is required
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Subject Code <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" formControlName="subjectCode"
+                   placeholder="e.g., MATH101"
+                   [ngClass]="{ 'is-invalid': submitted && f.subjectCode.errors }">
+            <div *ngIf="submitted && f.subjectCode.errors" class="invalid-feedback">
+              Subject code is required
+            </div>
+            <small class="text-secondary">Unique identifier for the subject</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" formControlName="description" rows="3"
+                      placeholder="Brief description of the subject"></textarea>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Schedule</label>
+              <input type="text" class="form-control" formControlName="schedule"
+                     placeholder="e.g., Mon/Wed 10:00-11:30">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Room</label>
+              <input type="text" class="form-control" formControlName="room"
+                     placeholder="e.g., Room 201">
+            </div>
+          </div>
+
+          <div class="text-end">
+            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="submitting">
+              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-1"></span>
+              {{ submitting ? 'Saving...' : 'Save Subject' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+================================================================================
+File: src\app\classroom\subjects\subjects.component.ts
+Size: 8.46 kB
+================================================================================
+
+import { Component, OnInit, AfterViewInit } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { first } from 'rxjs/operators';
+import { SubjectService } from '@app/_services/subject.service';
+import { AccountService, AlertService } from '@app/_services';
+import { Account } from '@app/_models';
+
+declare var bootstrap: any;
+
+@Component({
+  selector: 'app-subjects',
+  templateUrl: './subjects.component.html',
+  styleUrls: ['./subjects.component.css']
+})
+export class SubjectsComponent implements OnInit, AfterViewInit {
+  subjects: any[] = [];
+  filteredSubjects: any[] = [];
+  loading = true;
+  account: Account | null;
+  viewMode: 'enrolled' | 'available' = 'enrolled'; // Default to enrolled
+  
+  // Modal
+  modal: any;
+  modalTitle = 'Create Subject';
+  subjectForm!: FormGroup;
+  submitting = false;
+  submitted = false;
+  editingSubject: any = null;
+
+  constructor(
+    private subjectService: SubjectService,
+    private accountService: AccountService,
+    private alertService: AlertService,
+    private formBuilder: FormBuilder,
+    private router: Router
+  ) {
+    this.account = this.accountService.accountValue;
+  }
+
+// Add to constructor or ngOnInit
+ngOnInit() {
+  console.log('Current logged-in user:', this.account);
+  console.log('User AccountId:', this.account?.AccountId);
+  console.log('User Role:', this.account?.role);
+  
+  this.initForm();
+  this.loadSubjects();
+}
+
+  ngAfterViewInit() {
+    this.initializeModal();
+  }
+
+  initializeModal() {
+    const modalElement = document.getElementById('subjectModal');
+    if (modalElement) {
+      this.modal = new bootstrap.Modal(modalElement, {
+        backdrop: 'static',
+        keyboard: false
+      });
+    }
+  }
+
+  initForm() {
+    this.subjectForm = this.formBuilder.group({
+      subjectName: ['', Validators.required],
+      subjectCode: ['', Validators.required],
+      description: [''],
+      schedule: [''],
+      room: ['']
+    });
+  }
+
+  get f() { return this.subjectForm.controls; }
+
+  loadSubjects() {
+    this.loading = true;
+    
+    if (this.isTeacher()) {
+      // Teachers see all subjects they teach
+      this.subjectService.getMySubjects()
+        .pipe(first())
+        .subscribe({
+          next: (subjects: any[]) => {
+            console.log('Loaded subjects for teacher:', subjects);
+            this.subjects = subjects;
+            this.filterSubjects();
+            this.loading = false;
+          },
+          error: (error: any) => {
+            console.error('Error loading subjects:', error);
+            this.alertService.error('Failed to load subjects');
+            this.loading = false;
+          }
+        });
+    } else {
+      // Students see all subjects with enrollment status
+      this.subjectService.getAll()
+        .pipe(first())
+        .subscribe({
+          next: (subjects: any[]) => {
+            console.log('Loaded subjects for student:', subjects);
+            
+            // Add isEnrolled flag if not present
+            this.subjects = subjects.map(subject => ({
+              ...subject,
+              isEnrolled: subject.isEnrolled || false
+            }));
+            
+            console.log('Processed subjects:', this.subjects);
+            this.filterSubjects();
+            this.loading = false;
+            
+            // Log enrollment status for debugging
+            const enrolledCount = this.subjects.filter(s => s.isEnrolled).length;
+            console.log(`Student is enrolled in ${enrolledCount} subjects`);
+          },
+          error: (error: any) => {
+            console.error('Error loading subjects:', error);
+            this.alertService.error('Failed to load subjects');
+            this.loading = false;
+          }
+        });
+    }
+  }
+
+  filterSubjects() {
+    if (this.isStudent()) {
+      if (this.viewMode === 'enrolled') {
+        this.filteredSubjects = this.subjects.filter((s: any) => s.isEnrolled === true);
+        console.log('Enrolled subjects:', this.filteredSubjects); // Debug log
+      } else {
+        this.filteredSubjects = this.subjects.filter((s: any) => !s.isEnrolled);
+        console.log('Available subjects:', this.filteredSubjects); // Debug log
+      }
+    } else {
+      this.filteredSubjects = this.subjects;
+    }
+  }
+
+  setViewMode(mode: 'enrolled' | 'available') {
+    this.viewMode = mode;
+    this.filterSubjects();
+  }
+
+  isTeacher(): boolean {
+    return this.account?.role === 'Teacher' || this.account?.role === 'Admin';
+  }
+
+  isStudent(): boolean {
+    return this.account?.role === 'Student' || this.account?.role === 'User';
+  }
+
+  openCreateSubjectModal() {
+    console.log('Opening create subject modal');
+    this.modalTitle = 'Create Subject';
+    this.editingSubject = null;
+    this.subjectForm.reset();
+    this.submitted = false;
+    
+    if (!this.modal) {
+      this.initializeModal();
+    }
+    
+    if (this.modal) {
+      this.modal.show();
+    }
+  }
+
+  editSubject(subject: any) {
+    console.log('Editing subject:', subject);
+    this.modalTitle = 'Edit Subject';
+    this.editingSubject = subject;
+    this.subjectForm.patchValue({
+      subjectName: subject.subjectName,
+      subjectCode: subject.subjectCode,
+      description: subject.description || '',
+      schedule: subject.schedule || '',
+      room: subject.room || ''
+    });
+    this.submitted = false;
+    
+    if (this.modal) {
+      this.modal.show();
+    }
+  }
+
+  saveSubject() {
+    this.submitted = true;
+
+    if (this.subjectForm.invalid) {
+      return;
+    }
+
+    this.submitting = true;
+    
+    if (this.editingSubject) {
+      this.subjectService.update(this.editingSubject.subjectId, this.subjectForm.value)
+        .pipe(first())
+        .subscribe({
+          next: (response: any) => {
+            console.log('Subject updated:', response);
+            this.alertService.success('Subject updated successfully');
+            this.modal.hide();
+            this.loadSubjects();
+            this.submitting = false;
+          },
+          error: (error: any) => {
+            console.error('Error updating subject:', error);
+            this.alertService.error(error.message || 'Failed to update subject');
+            this.submitting = false;
+          }
+        });
+    } else {
+      console.log('Creating subject:', this.subjectForm.value);
+      this.subjectService.create(this.subjectForm.value)
+        .pipe(first())
+        .subscribe({
+          next: (response: any) => {
+            console.log('Subject created:', response);
+            this.alertService.success('Subject created successfully');
+            this.modal.hide();
+            this.loadSubjects();
+            this.submitting = false;
+          },
+          error: (error: any) => {
+            console.error('Error creating subject:', error);
+            this.alertService.error(error.message || 'Failed to create subject');
+            this.submitting = false;
+          }
+        });
+    }
+  }
+
+enrollSubject(subject: any) {
+  if (confirm(`Are you sure you want to enroll in ${subject.subjectName}?`)) {
+    console.log('Enrolling in subject:', subject); // Add this log
+    
+    this.subjectService.enroll(subject.subjectId)
+      .pipe(first())
+      .subscribe({
+        next: (response) => {
+          console.log('Enroll response:', response); // Add this log
+          this.alertService.success(`Successfully enrolled in ${subject.subjectName}`);
+          
+          // Force reload from server
+          this.loadSubjects();
+          
+          // Switch to enrolled view
+          if (this.isStudent()) {
+            this.viewMode = 'enrolled';
+          }
+        },
+        error: (error: any) => {
+          console.error('Error enrolling:', error);
+          this.alertService.error(error.message || 'Failed to enroll');
+        }
+      });
+  }
+}
+  // Add these helper methods
+getEnrolledCount(): number {
+  return this.subjects.filter(s => s.isEnrolled).length;
+}
+
+getAvailableCount(): number {
+  return this.subjects.filter(s => !s.isEnrolled).length;
+}
+
+  viewSubject(subject: any) {
+    this.router.navigate(['/classroom/subject', subject.subjectId], {
+      state: { subject: subject }
+    });
+  }
+}
+
+================================================================================
+File: src\app\classroom\view-answers\view-answers.component.css
+Size: 3.69 kB
+================================================================================
+
+.view-answers-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
+
+/* Question Card */
+.question-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.question-header {
+  padding: 1.5rem 1.5rem 0.5rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.question-header .badge {
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  font-weight: 500;
+}
+
+.question-content {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+.question-text {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 16px;
+  border-left: 4px solid #0d6efd;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.question-footer {
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.answer-count {
+  background: #e7f1ff;
+  color: #0d6efd;
+  padding: 0.3rem 1rem;
+  border-radius: 30px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Answers Section */
+.answers-section {
+  margin-top: 2rem;
+}
+
+.answer-item {
+  margin-bottom: 1.5rem;
+  animation: slideIn 0.3s ease;
+}
+
+.answer-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.2s;
+}
+
+.answer-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.answer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.student-avatar {
+  color: #0d6efd;
+}
+
+.relevance-badge {
+  padding: 0.4rem 1rem;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+.relevance-badge.relevant {
+  background: #d1e7dd;
+  color: #0a3622;
+}
+
+.relevance-badge.not-relevant {
+  background: #f8d7da;
+  color: #58151c;
+}
+
+.answer-content {
+  background: #f8f9fa;
+  padding: 1.25rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.ai-feedback {
+  background: #e7f1ff;
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #0d6efd;
+}
+
+.ai-feedback.relevant {
+  background: #d1e7dd;
+  border-left-color: #198754;
+}
+
+.ai-feedback.not-relevant {
+  background: #f8d7da;
+  border-left-color: #dc3545;
+}
+
+.ai-feedback i {
+  color: inherit;
+}
+
+.answer-meta {
+  text-align: right;
+}
+
+.no-answers {
+  background: #f8f9fa;
+  border-radius: 16px;
+  padding: 3rem;
+}
+
+.empty-state {
+  opacity: 0.7;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .view-answers-container {
+    padding: 1rem;
+  }
+
+  .question-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .answer-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .relevance-badge {
+    align-self: flex-start;
+  }
+
+  .question-text {
+    font-size: 1rem;
+  }
+}
+
+================================================================================
+File: src\app\classroom\view-answers\view-answers.component.html
+Size: 4.8 kB
+================================================================================
+
+<div class="view-answers-container">
+  <!-- Header with Back Button -->
+  <div class="mb-4">
+    <button class="back-link" (click)="goBack()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to Questions
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div
+      class="spinner-border text-primary"
+      style="width: 3rem; height: 3rem"
+      role="status"
+    >
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-secondary">Loading answers...</p>
+  </div>
+
+  <div *ngIf="!loading">
+    <!-- Question Card -->
+    <div class="question-card mb-4">
+      <div class="question-header">
+        <span class="badge bg-primary">
+          <i class="bi bi-question-circle me-1"></i>
+          Question
+        </span>
+        <small class="text-secondary">
+          <i class="bi bi-clock me-1"></i>
+          {{ question?.createdAt | date: "medium" }}
+        </small>
+      </div>
+
+      <div class="question-content">
+        <h5 class="mb-3">Question Details:</h5>
+        <div class="question-text">
+          <p class="mb-0">
+            {{ question?.questionText || "Loading question..." }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Teacher Info in question footer -->
+      <div class="question-footer">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-person-circle text-primary me-2"></i>
+          <span class="text-secondary">
+            By: <strong>{{ question?.teacherName || "Teacher" }}</strong>
+          </span>
+        </div>
+        <div class="answer-count">
+          <i class="bi bi-chat-dots me-1"></i>
+          {{ answers.length }} {{ answers.length === 1 ? "Answer" : "Answers" }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Answers Section -->
+    <div class="answers-section">
+      <h3 class="h4 mb-4">
+        <i class="bi bi-chat-dots-fill text-primary me-2"></i>
+        Student Answers
+      </h3>
+
+      <!-- No Answers State -->
+      <div *ngIf="answers.length === 0" class="no-answers text-center py-5">
+        <div class="empty-state mb-4">
+          <i class="bi bi-chat" style="font-size: 4rem; color: #dee2e6"></i>
+        </div>
+        <h4 class="h5 text-secondary mb-3">No Answers Yet</h4>
+        <p class="text-secondary mb-0">
+          Students haven't answered this question yet.
+        </p>
+      </div>
+
+      <!-- Answers List -->
+      <div *ngIf="answers.length > 0" class="answers-list">
+        <div *ngFor="let answer of answers; let i = index" class="answer-item">
+          <div class="answer-card">
+            <!-- Answer Header -->
+            <div class="answer-header">
+              <div class="d-flex align-items-center">
+                <div class="student-avatar me-3">
+                  <i class="bi bi-person-circle fs-3"></i>
+                </div>
+                <div>
+                  <h6 class="mb-1">
+                    Student {{ answer.studentId || "Anonymous" }}
+                  </h6>
+                  <small class="text-secondary">
+                    <i class="bi bi-clock me-1"></i>
+                    {{ answer.submittedAt | date: "medium" }}
+                  </small>
+                </div>
+              </div>
+              <span
+                class="relevance-badge"
+                [ngClass]="getRelevanceClass(answer.aiReview?.isRelevant)"
+              >
+                <i
+                  [class]="
+                    'bi me-1 ' + getRelevanceIcon(answer.aiReview?.isRelevant)
+                  "
+                ></i>
+                {{ getRelevanceBadge(answer.aiReview?.isRelevant) }}
+              </span>
+            </div>
+
+            <!-- Answer Content -->
+            <div class="answer-content">
+              <p class="mb-0">{{ answer.answerText }}</p>
+            </div>
+
+            <!-- AI Feedback -->
+            <div
+              *ngIf="answer.aiReview"
+              class="ai-feedback"
+              [ngClass]="getRelevanceClass(answer.aiReview.isRelevant)"
+            >
+              <div class="d-flex">
+                <i class="bi bi-robot me-2 fs-5"></i>
+                <div>
+                  <strong>AI Feedback:</strong>
+                  <p class="mb-0 mt-1">{{ answer.aiReview.feedback }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Answer Meta -->
+            <div class="answer-meta">
+              <small class="text-secondary">
+                <i class="bi bi-bar-chart me-1"></i>
+                Answer #{{ i + 1 }}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+================================================================================
+File: src\app\classroom\view-answers\view-answers.component.ts
+Size: 2.51 kB
+================================================================================
+
+import { Component, OnInit } from "@angular/core";
+import { ActivatedRoute, Router } from "@angular/router";
+import { HttpClient } from "@angular/common/http";
+import { environment } from "@environments/environment";
+
+@Component({
+  templateUrl: "./view-answers.component.html",
+  styleUrls: ["./view-answers.component.css"],
+})
+export class ViewAnswersComponent implements OnInit {
+  questionId!: string;
+  question: any = null;
+  answers: any[] = [];
+  loading = true;
+  loadingAnswers = true;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private http: HttpClient,
+  ) {}
+
+  ngOnInit() {
+    this.questionId = this.route.snapshot.paramMap.get("id")!;
+    this.loadQuestion();
+    this.loadAnswers();
+  }
+
+  loadQuestion() {
+    // Try to get from state first
+    const state = history.state;
+    if (state && state.question) {
+      this.question = state.question;
+    } else {
+      // If not in state, fetch from API
+      this.http
+        .get<any>(
+          `${environment.apiUrl}/classroom/questions/${this.questionId}`,
+        )
+        .subscribe({
+          next: (data) => {
+            this.question = data;
+            // Format teacher name if not already formatted
+            if (data.teacher) {
+              this.question.teacherName = `${data.teacher.firstName} ${data.teacher.lastName}`;
+            }
+          },
+          error: (err) => {
+            console.error("Error loading question:", err);
+          },
+        });
+    }
+  }
+
+  loadAnswers() {
+    this.loadingAnswers = true;
+    this.http
+      .get<
+        any[]
+      >(`${environment.apiUrl}/classroom/questions/${this.questionId}/answers`)
+      .subscribe({
+        next: (data) => {
+          this.answers = data;
+          this.loadingAnswers = false;
+          this.loading = false;
+        },
+        error: (err) => {
+          console.error("Error loading answers:", err);
+          this.loadingAnswers = false;
+          this.loading = false;
+        },
+      });
+  }
+
+  goBack() {
+    this.router.navigate(["/classroom"]);
+  }
+
+  getRelevanceClass(isRelevant: boolean): string {
+    return isRelevant ? "relevant" : "not-relevant";
+  }
+
+  getRelevanceBadge(isRelevant: boolean): string {
+    return isRelevant ? "Relevant" : "Not Relevant";
+  }
+
+  getRelevanceIcon(isRelevant: boolean): string {
+    return isRelevant ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill";
+  }
+}
+
+
+================================================================================
+File: src\app\home\home.component.css
+Size: 1.48 kB
+================================================================================
+
+.home-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.welcome-card {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 2rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.stat-icon.bg-primary { background: #0d6efd; }
+.stat-icon.bg-success { background: #198754; }
+.stat-icon.bg-info { background: #0dcaf0; }
+
+.quick-actions {
+  margin-top: 2rem;
+}
+
+.action-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(13,110,253,0.15);
+  border-color: #0d6efd;
+}
+
+.action-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .home-container {
+    padding: 1rem;
+  }
+  
+  .welcome-card {
+    padding: 1.5rem;
+  }
+  
+  .display-5 {
+    font-size: 1.8rem;
   }
 }
 
@@ -1755,7 +5066,7 @@ export class ProfileModule { }
 
 ================================================================================
 File: src\app\profile\update.component.html
-Size: 3.87 kB
+Size: 3.66 kB
 ================================================================================
 
 ﻿<h1>Update Profile</h1>
@@ -1822,10 +5133,7 @@ Size: 3.87 kB
             <span *ngIf="submitting" class="spinner-border spinner-border-sm me-1"></span>
             Update
         </button>
-        <button type="button" (click)="onDelete()" [disabled]="deleting" class="btn btn-danger">
-            <span *ngIf="deleting" class="spinner-border spinner-border-sm me-1"></span>
-            Delete
-        </button>
+        
         <a routerLink="../" href="" class="btn btn-link">Cancel</a>
     </div>
 </form>
@@ -2659,12 +5967,14 @@ export * from './role';
 
 ================================================================================
 File: src\app\_models\role.ts
-Size: 59 B
+Size: 147 B
 ================================================================================
 
 export enum Role {
-    User = 'User',
-    Admin = 'Admin'
+    Admin = 'Admin',
+    Teacher = 'Teacher',
+    Student = 'Student',
+    User = 'User' // Keeping for backward compatibility
 }
 
 ================================================================================
@@ -2852,11 +6162,92 @@ export class AlertService {
 
 ================================================================================
 File: src\app\_services\index.ts
-Size: 70 B
+Size: 105 B
 ================================================================================
 
 ﻿export * from './account.service';
 export * from './alert.service';
+export * from './subject.service';
+
+================================================================================
+File: src\app\_services\subject.service.ts
+Size: 2.33 kB
+================================================================================
+
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '@environments/environment';
+
+export interface Subject {
+    subjectId: number;
+    subjectName: string;
+    subjectCode: string;
+    description?: string;
+    teacherId: number;
+    teacherName?: string;
+    schedule?: string;
+    room?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    studentCount?: number;
+    questionCount?: number;
+    isEnrolled?: boolean;
+}
+
+const baseUrl = `${environment.apiUrl}/subjects`;
+
+@Injectable({
+    providedIn: 'root'
+})
+export class SubjectService {
+    constructor(private http: HttpClient) { }
+
+    getAll(): Observable<Subject[]> {
+        const url = `${baseUrl}?_t=${new Date().getTime()}`;
+        console.log('Fetching subjects from:', url);
+        return this.http.get<Subject[]>(url);
+    }
+    getMySubjects(): Observable<Subject[]> {
+        return this.http.get<Subject[]>(`${baseUrl}/my-subjects`);
+    }
+
+    getById(subjectId: number): Observable<Subject> {
+        return this.http.get<Subject>(`${baseUrl}/${subjectId}`);
+    }
+
+    create(params: any): Observable<Subject> {
+        return this.http.post<Subject>(baseUrl, params);
+    }
+
+    update(subjectId: number, params: any): Observable<Subject> {
+        return this.http.put<Subject>(`${baseUrl}/${subjectId}`, params);
+    }
+
+    delete(subjectId: number): Observable<any> {
+        return this.http.delete(`${baseUrl}/${subjectId}`);
+    }
+
+    enroll(subjectId: number): Observable<any> {
+        return this.http.post(`${baseUrl}/${subjectId}/enroll`, {});
+    }
+
+    addStudent(subjectId: number, studentId: number): Observable<any> {
+        return this.http.post(`${baseUrl}/${subjectId}/students`, { studentId });
+    }
+
+    removeStudent(subjectId: number, studentId: number): Observable<any> {
+        return this.http.delete(`${baseUrl}/${subjectId}/students/${studentId}`);
+    }
+
+    getStudents(subjectId: number): Observable<any[]> {
+        return this.http.get<any[]>(`${baseUrl}/${subjectId}/students`);
+    }
+
+    getSubjectQuestions(subjectId: number): Observable<any[]> {
+        return this.http.get<any[]>(`${baseUrl}/${subjectId}/questions`);
+    }
+}
 
 ================================================================================
 File: src\environments\environment.prod.ts
@@ -3004,25 +6395,68 @@ import 'zone.js';  // Included with Angular CLI.
 
 ================================================================================
 File: src\styles.less
-Size: 341 B
+Size: 960 B
 ================================================================================
 
-/* You can add global styles to this file, and also import other style files */
-.app-container {
-    min-height: 320px;
+/* Modal styles for fallback */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1050;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  outline: 0;
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
-.admin-nav {
-    padding-top: 0;
-    padding-bottom: 0;
-    background-color: #e8e9ea;
-    border-bottom: 1px solid #ccc;
+.modal-dialog {
+  position: relative;
+  width: auto;
+  margin: 1.75rem auto;
+  max-width: 500px;
 }
 
-.btn-delete-account {
-    width: 40px;
-    text-align: center;
-    box-sizing: content-box;
+.modal-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  pointer-events: auto;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid rgba(0,0,0,.2);
+  border-radius: 0.3rem;
+  outline: 0;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.modal-body {
+  position: relative;
+  flex: 1 1 auto;
+  padding: 1rem;
+}
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1040;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000;
+}
+
+.modal-backdrop.show {
+  opacity: 0.5;
 }
 
 ================================================================================

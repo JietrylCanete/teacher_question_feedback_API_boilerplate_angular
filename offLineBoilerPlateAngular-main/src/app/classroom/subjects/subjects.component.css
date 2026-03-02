@@ -1,0 +1,152 @@
+.subjects-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.subject-card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.subject-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(13,110,253,0.15);
+}
+
+/* Enrolled card specific styles */
+.subject-card.enrolled {
+  border-left: 4px solid #198754;
+  background: linear-gradient(to right, rgba(25, 135, 84, 0.02), transparent);
+}
+
+.subject-card.enrolled:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(25, 135, 84, 0.15);
+}
+
+.stats-row .badge {
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.stats-row .badge.bg-info {
+  background: #e7f1ff !important;
+  color: #0d6efd !important;
+  border-color: #b6d4fe;
+}
+
+.stats-row .badge.bg-success {
+  background: #d1e7dd !important;
+  color: #198754 !important;
+  border-color: #badbcc;
+}
+
+.stats-row .badge i {
+  margin-right: 0.3rem;
+  font-size: 0.9rem;
+}
+
+/* Success badge for enrolled */
+.badge.bg-success {
+  background-color: #198754 !important;
+  color: white;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  color: #6c757d;
+}
+
+.btn-group {
+  border-radius: 30px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.btn-group .btn {
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  min-width: 150px; /* Added for consistent button width */
+}
+
+.empty-state-icon {
+  opacity: 0.7;
+}
+
+.modal-content {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  padding: 1.5rem;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .subjects-container {
+    padding: 1rem;
+  }
+  
+  .display-6 {
+    font-size: 1.75rem;
+  }
+  
+  .btn-group .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    min-width: 120px; /* Adjusted for mobile */
+  }
+}
+/* Simple Toggle Buttons */
+.simple-toggle {
+  border-radius: 40px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.simple-toggle .btn {
+  padding: 0.6rem 1.5rem;
+  font-weight: 500;
+  border: 1px solid #0d6efd;
+}
+
+.simple-toggle .btn-primary {
+  background-color: #0d6efd;
+  color: white;
+}
+
+.simple-toggle .btn-outline-primary {
+  background-color: white;
+  color: #0d6efd;
+}
+
+.simple-toggle .btn-primary .badge {
+  background-color: white !important;
+  color: #0d6efd !important;
+}
+
+.simple-toggle .btn-outline-primary .badge {
+  background-color: #0d6efd !important;
+  color: white !important;
+}
+
+/* Mobile responsive */
+@media (max-width: 576px) {
+  .simple-toggle .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}

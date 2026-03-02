@@ -43,6 +43,45 @@ async function initialize() {
 
     db.Answer.hasOne(db.AIReview, { foreignKey: 'answerId' });
     db.AIReview.belongsTo(db.Answer, { foreignKey: 'answerId' });
+    // Add this to the relationships section in initialize() function
+    // Add teacher relationship
+    db.Account.hasMany(db.Question, { foreignKey: 'teacherId', as: 'questions' });
+    db.Question.belongsTo(db.Account, { foreignKey: 'teacherId', as: 'teacher' });
+    // Add these to your relationships section
+    // Subject relationships
+    db.Subject = require('../classroom/subject.model')(sequelize);
+    db.SubjectEnrollment = require('../classroom/subject-enrollment.model')(sequelize);
+    // Subject relationships
+    db.Account.hasMany(db.Subject, { foreignKey: 'teacherId', as: 'taughtSubjects' });
+    db.Subject.belongsTo(db.Account, { foreignKey: 'teacherId', as: 'teacher' });
+    // Enrollment relationships
+    db.Subject.belongsToMany(db.Account, { 
+    through: db.SubjectEnrollment, 
+    foreignKey: 'subjectId', 
+    otherKey: 'studentId',
+    as: 'students'
+    });
+    db.Account.belongsToMany(db.Subject, { 
+    through: db.SubjectEnrollment, 
+    foreignKey: 'studentId', 
+    otherKey: 'subjectId',
+    as: 'enrolledSubjects' 
+    });
+    db.Subject.hasMany(db.SubjectEnrollment, { foreignKey: 'subjectId' });
+    db.SubjectEnrollment.belongsTo(db.Subject, { foreignKey: 'subjectId' });
+    db.Account.hasMany(db.SubjectEnrollment, { foreignKey: 'studentId' });
+    db.SubjectEnrollment.belongsTo(db.Account, { foreignKey: 'studentId', as: 'student' });
+
+    // Update Question relationships
+    db.Subject.hasMany(db.Question, { foreignKey: 'subjectId' });
+    db.Question.belongsTo(db.Subject, { foreignKey: 'subjectId' });
+
+
+
+
+
+
+
 
     // Sync all models with database
     await sequelize.sync({ alter: true });

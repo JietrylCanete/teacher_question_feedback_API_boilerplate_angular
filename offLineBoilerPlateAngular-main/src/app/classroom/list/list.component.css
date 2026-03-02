@@ -75,3 +75,60 @@
     font-size: 0.9rem;
   }
 }
+
+/* Add to your existing CSS */
+
+.answered-card {
+  opacity: 0.85;
+  border-left: 4px solid #198754 !important;
+}
+
+.btn-success {
+  background-color: #198754;
+  border-color: #198754;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #157347;
+  border-color: #146c43;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(25,135,84,0.3);
+}
+
+.disabled-btn {
+  cursor: not-allowed;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.btn-success i, .btn-outline-primary i {
+  margin-right: 0.5rem;
+}
+
+/* Tooltip style for answered questions */
+[disabled] {
+  position: relative;
+}
+
+[disabled]:hover::after {
+  content: 'You have already answered this question';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-bottom: 5px;
+  z-index: 1000;
+}
+
+.badge.bg-success {
+  background-color: #198754 !important;
+  color: white;
+  font-size: 0.75rem;
+}

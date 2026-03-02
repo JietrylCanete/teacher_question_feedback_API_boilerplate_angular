@@ -13,15 +13,31 @@ router.get('/questions/:id/answers', authorize(['Teacher', 'Admin']), getAnswers
 
 // NEW: Get a single question by ID
 router.get('/questions/:id', authorize(), getQuestionById);
+router.get('/questions/:id/my-answer', authorize(), checkMyAnswer);
 
+function checkMyAnswer(req, res, next) {
+    classroomService.checkMyAnswer(req.params.id, req.user.AccountId)
+        .then(result => res.json(result))
+        .catch(next);
+}
 function createQuestion(req, res, next) {
-    classroomService.createQuestion(req.body.questionText, req.user.AccountId)
+    console.log('Create question request body:', req.body); // Debug log
+    console.log('User ID:', req.user.AccountId); // Debug log
+    
+    classroomService.createQuestion(
+        req.body.questionText, 
+        req.user.AccountId,
+        req.body.subjectId,
+        req.body.dueDate,
+        req.body.points
+    )
         .then(question => res.json(question))
         .catch(next);
 }
 
 function getQuestions(req, res, next) {
-    classroomService.getQuestions()
+    // Pass user ID and role to service
+    classroomService.getQuestions(req.user.AccountId, req.user.role)
         .then(questions => res.json(questions))
         .catch(next);
 }
@@ -43,7 +59,11 @@ function submitAnswer(req, res, next) {
 }
 
 function getAnswers(req, res, next) {
-    classroomService.getAnswersByQuestionId(req.params.id)
+    classroomService.getAnswersByQuestionId(
+        req.params.id, 
+        req.user.AccountId, 
+        req.user.role
+    )
         .then(answers => res.json(answers))
         .catch(next);
 }

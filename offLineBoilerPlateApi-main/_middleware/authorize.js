@@ -43,7 +43,7 @@ function authorize(roles = []) {
                 req.user.ownsToken = token => !!refreshTokens.find(x => x.token === token);
 
                 // Log authorization attempt
-                console.log(`Authorization successful for user ${account.email} with role ${account.role}`);
+                //console.log(`Authorization successful for user ${account.email} with role ${account.role}`);
 
                 next();
             } catch (error) {

@@ -27,6 +27,8 @@ app.use('/accounts', require('./accounts/account.controller'));
 app.use('/api-docs', require('./_helpers/swagger'));
 // Add classroom routes
 app.use('/classroom', require('./classroom/classroom.controller'));
+// Add subject routes
+app.use('/subjects', require('./classroom/subject.controller'));
 
 app.use(errorHandler);
 

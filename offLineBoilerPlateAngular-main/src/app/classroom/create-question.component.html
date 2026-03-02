@@ -1,10 +1,10 @@
 <div class="create-container">
   <!-- Header -->
   <div class="d-flex align-items-center mb-4">
-    <a routerLink="/classroom" class="back-link">
+    <button class="back-link" (click)="goBack()">
       <i class="bi bi-arrow-left me-2"></i>
-      Back to Questions
-    </a>
+      Back
+    </button>
     <h1 class="display-6 fw-bold text-primary ms-3 mb-0">
       <i class="bi bi-plus-circle me-2"></i>Create Question
     </h1>
@@ -13,12 +13,50 @@
   <div class="row justify-content-center">
     <div class="col-lg-8">
       <div class="create-card">
-        <form [formGroup]="form" (ngSubmit)="onSubmit()">
+        <!-- Loading State -->
+        <div *ngIf="loadingSubjects" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading subjects...</span>
+          </div>
+          <p class="mt-3 text-secondary">Loading your subjects...</p>
+        </div>
+
+        <!-- No Subjects Warning -->
+        <div *ngIf="!loadingSubjects && subjects.length === 0" class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          You don't have any subjects yet. 
+          <a routerLink="/classroom/subjects" class="alert-link">Create a subject first</a> before creating questions.
+        </div>
+
+        <!-- Create Question Form -->
+        <form *ngIf="!loadingSubjects && subjects.length > 0" [formGroup]="form" (ngSubmit)="onSubmit()">
+          <!-- Subject Selection -->
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-book text-primary me-2"></i>
+              Subject <span class="text-danger">*</span>
+            </label>
+            <select class="form-select" formControlName="subjectId"
+                    [ngClass]="{ 'is-invalid': submitted && f.subjectId.errors }">
+              <option value="">-- Select a subject --</option>
+              <option *ngFor="let subject of subjects" [value]="subject.subjectId">
+                {{ subject.subjectName }} ({{ subject.subjectCode }})
+              </option>
+            </select>
+            <div *ngIf="submitted && f.subjectId.errors" class="invalid-feedback">
+              Please select a subject
+            </div>
+            <div *ngIf="subjectId && subjects.length > 0" class="text-info mt-1">
+              <i class="bi bi-info-circle me-1"></i>
+              Creating question for: {{ getSelectedSubjectName() }}
+            </div>
+          </div>
+
           <!-- Question Input -->
           <div class="mb-4">
             <label class="form-label">
               <i class="bi bi-question-circle text-primary me-2"></i>
-              Question
+              Question <span class="text-danger">*</span>
             </label>
             <textarea
               class="form-control"
@@ -57,6 +95,24 @@
             </div>
           </div>
 
+          <!-- Optional Fields -->
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <label class="form-label">
+                <i class="bi bi-calendar text-primary me-2"></i>
+                Due Date (Optional)
+              </label>
+              <input type="datetime-local" class="form-control" formControlName="dueDate">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">
+                <i class="bi bi-star text-primary me-2"></i>
+                Points (Optional)
+              </label>
+              <input type="number" class="form-control" formControlName="points" min="0" max="1000">
+            </div>
+          </div>
+
           <!-- Tips Section -->
           <div class="tips-card mb-4">
             <h6 class="mb-3">
@@ -86,19 +142,26 @@
           <!-- Action Buttons -->
           <div class="d-flex gap-3">
             <button type="submit" 
-                    [disabled]="submitting" 
+                    [disabled]="submitting || loadingSubjects" 
                     class="btn btn-primary flex-grow-1">
               <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2"></span>
               <i *ngIf="!submitting" class="bi bi-send me-2"></i>
               {{ submitting ? 'Creating...' : 'Create Question' }}
             </button>
             
-            <a routerLink="/classroom" class="btn btn-outline-secondary">
+            <button type="button" class="btn btn-outline-secondary" (click)="goBack()">
               <i class="bi bi-x-circle me-2"></i>
               Cancel
-            </a>
+            </button>
           </div>
         </form>
+
+        <!-- Alternative for no subjects -->
+        <div *ngIf="!loadingSubjects && subjects.length === 0" class="text-center py-4">
+          <a routerLink="/classroom/subjects" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Create Subject First
+          </a>
+        </div>
       </div>
     </div>
   </div>

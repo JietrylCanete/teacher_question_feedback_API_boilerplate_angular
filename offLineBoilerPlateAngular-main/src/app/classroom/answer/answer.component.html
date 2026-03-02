@@ -29,10 +29,13 @@
           </div>
         </div>
 
+        <!-- Teacher Info in question card -->
         <div class="question-footer">
-          <i class="bi bi-person-circle text-primary me-2"></i>
-          <span class="text-secondary">Teacher</span>
-        </div>
+           <i class="bi bi-person-circle text-primary me-2"></i>
+            <span class="text-secondary">
+               By: <strong>{{ question?.teacherName || 'Teacher' }}</strong>
+            </span>
+</div>
       </div>
 
       <!-- Tips Card -->

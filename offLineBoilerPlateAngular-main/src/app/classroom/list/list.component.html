@@ -3,31 +3,30 @@
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
       <h1 class="display-6 fw-bold text-primary mb-2">
-        <i class="bi bi-mortarboard-fill me-2"></i>Classroom
+        <i class="bi bi-question-circle-fill me-2"></i>All Questions
       </h1>
       <p class="text-secondary">
-        {{ canCreateQuestion() ? 'Manage your questions' : 'Browse and answer questions' }}
+        Browse all questions from all subjects
       </p>
     </div>
     <div class="d-flex gap-2">
-      <!-- Teacher/Admin Actions - Only Create Question Button -->
-      <ng-container *ngIf="canCreateQuestion()">
-        <a routerLink="/classroom/create" class="btn btn-primary">
-          <i class="bi bi-plus-circle me-2"></i>Create Question
-        </a>
-      </ng-container>
-      
-      <!-- Refresh Button for everyone -->
+      <a routerLink="/classroom/subjects" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left me-2"></i>Back to Subjects
+      </a>
       <button class="btn btn-outline-secondary" (click)="refreshQuestions()" [disabled]="loading">
         <i class="bi bi-arrow-clockwise me-1"></i>Refresh
       </button>
     </div>
   </div>
 
-  <!-- Info Banner for Students/Users -->
-  <div *ngIf="isStudent()" class="info-banner mb-4">
-    <i class="bi bi-info-circle-fill me-2"></i>
-    You're viewing questions from your teachers. Click "Answer" to submit your response.
+  <!-- Subject Filter -->
+  <div class="mb-4">
+    <select class="form-select" style="width: auto; display: inline-block;" (change)="filterBySubject($event)">
+      <option value="all">All Subjects</option>
+      <option *ngFor="let subject of subjects" [value]="subject.subjectId">
+        {{ subject.subjectName }} ({{ subject.subjectCode }})
+      </option>
+    </select>
   </div>
 
   <!-- Loading State -->
@@ -39,18 +38,30 @@
   </div>
 
   <!-- Questions Grid -->
-  <div *ngIf="!loading && questions.length > 0" class="row g-4">
-    <div *ngFor="let q of questions" class="col-md-6 col-lg-4">
-      <div class="card h-100">
+  <div *ngIf="!loading && filteredQuestions.length > 0" class="row g-4">
+    <div *ngFor="let q of filteredQuestions" class="col-md-6 col-lg-4">
+      <div class="card h-100" [ngClass]="{'answered-card': isStudent() && q.hasAnswered}">
         <div class="card-body">
           <!-- Question Header -->
           <div class="d-flex justify-content-between align-items-start mb-3">
             <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
               <i class="bi bi-question-circle-fill me-1"></i>Question
             </span>
-            <small class="text-secondary">
-              <i class="bi bi-clock me-1"></i>{{ q.createdAt | date:'short' }}
-            </small>
+            <div class="d-flex align-items-center gap-2">
+              <span *ngIf="isStudent() && q.hasAnswered" class="badge bg-success px-3 py-2 rounded-pill">
+                <i class="bi bi-check-circle-fill me-1"></i>Answered
+              </span>
+              <small class="text-secondary">
+                <i class="bi bi-clock me-1"></i>{{ q.createdAt | date:'short' }}
+              </small>
+            </div>
+          </div>
+
+          <!-- Subject Info -->
+          <div class="mb-2">
+            <span class="badge bg-info bg-opacity-10 text-info px-2 py-1 rounded-pill">
+              <i class="bi bi-book me-1"></i>{{ q.subjectName || 'General' }} ({{ q.subjectCode || 'GEN101' }})
+            </span>
           </div>
 
           <!-- Question Content -->
@@ -61,66 +72,56 @@
           <!-- Teacher Info -->
           <div class="d-flex align-items-center mb-3">
             <i class="bi bi-person-circle text-primary me-2"></i>
-            <span class="text-secondary small">By: Teacher</span>
+            <span class="text-secondary small">
+              By: <strong>{{ q.teacherName || 'Teacher' }}</strong>
+            </span>
           </div>
 
-          <!-- Action Button - Different based on role -->
-          <!-- Action Button - Different based on role -->
-<div class="d-grid">
-  <!-- For Students/Users - Answer button -->
-  <ng-container *ngIf="isStudent()">
-    <button (click)="navigateToQuestion(q)" 
-            class="btn btn-outline-primary btn-lg">
-      <i class="bi bi-pencil-square me-2"></i>Answer Question
-    </button>
-  </ng-container>
-  
-  <!-- For Teachers/Admins - View Answers button -->
-  <ng-container *ngIf="!isStudent() && canCreateQuestion()">
-    <button (click)="navigateToQuestion(q)" 
-            class="btn btn-outline-info btn-lg">
-      <i class="bi bi-eye me-2"></i>View Answers
-    </button>
-  </ng-container>
-  
-  <!-- Fallback for any other role -->
-  <ng-container *ngIf="!isStudent() && !canCreateQuestion()">
-    <button (click)="navigateToQuestion(q)" 
-            class="btn btn-outline-primary btn-lg">
-      <i class="bi bi-pencil-square me-2"></i>Answer Question
-    </button>
-  </ng-container>
-</div>
+          <!-- Action Button -->
+          <div class="d-grid">
+            <ng-container *ngIf="isStudent()">
+              <button (click)="navigateToQuestion(q)" 
+                      [disabled]="q.hasAnswered"
+                      class="btn btn-lg"
+                      [ngClass]="{
+                        'btn-outline-primary': !q.hasAnswered,
+                        'btn-success': q.hasAnswered
+                      }">
+                <i class="bi me-2" [ngClass]="{
+                  'bi-pencil-square': !q.hasAnswered,
+                  'bi-check-circle-fill': q.hasAnswered
+                }"></i>
+                {{ q.hasAnswered ? 'Already Answered' : 'Answer Question' }}
+              </button>
+            </ng-container>
+            
+            <ng-container *ngIf="isTeacher()">
+              <button (click)="viewAnswers(q)" class="btn btn-outline-info btn-lg">
+                <i class="bi bi-eye me-2"></i>View Answers
+              </button>
+            </ng-container>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Empty State -->
-  <div *ngIf="!loading && questions.length === 0" class="text-center py-5">
+  <div *ngIf="!loading && filteredQuestions.length === 0" class="text-center py-5">
     <div class="empty-state-icon mb-4">
       <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
     </div>
-    <h3 class="h4 text-secondary mb-3">No Questions Available</h3>
+    <h3 class="h4 text-secondary mb-3">No Questions Found</h3>
     
-    <!-- Different messages based on role -->
-    <ng-container *ngIf="canCreateQuestion()">
-      <p class="text-secondary mb-4">Be the first to create a question</p>
+    <ng-container *ngIf="isTeacher()">
+      <p class="text-secondary mb-4">Create your first question</p>
       <a routerLink="/classroom/create" class="btn btn-primary">
         <i class="bi bi-plus-circle me-2"></i>Create Question
       </a>
     </ng-container>
     
     <ng-container *ngIf="isStudent()">
-      <p class="text-secondary mb-4">Check back later for new questions from your teachers</p>
-      <button class="btn btn-primary" (click)="refreshQuestions()">
-        <i class="bi bi-arrow-clockwise me-2"></i>Refresh
-      </button>
-    </ng-container>
-    
-    <!-- Fallback for any other role -->
-    <ng-container *ngIf="!canCreateQuestion() && !isStudent()">
-      <p class="text-secondary mb-4">No questions available at the moment</p>
+      <p class="text-secondary mb-4">Check back later for new questions</p>
       <button class="btn btn-primary" (click)="refreshQuestions()">
         <i class="bi bi-arrow-clockwise me-2"></i>Refresh
       </button>

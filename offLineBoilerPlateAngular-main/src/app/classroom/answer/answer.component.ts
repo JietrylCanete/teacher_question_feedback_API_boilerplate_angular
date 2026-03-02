@@ -1,12 +1,12 @@
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '@environments/environment';
+import { Component, OnInit } from "@angular/core";
+import { ActivatedRoute, Router } from "@angular/router";
+import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { HttpClient } from "@angular/common/http";
+import { environment } from "@environments/environment";
 
 @Component({
-  templateUrl: './answer.component.html',
-  styleUrls: ['./answer.component.css']
+  templateUrl: "./answer.component.html",
+  styleUrls: ["./answer.component.css"],
 })
 export class AnswerComponent implements OnInit {
   form!: FormGroup;
@@ -20,18 +20,21 @@ export class AnswerComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private fb: FormBuilder,
-    private http: HttpClient
+    private http: HttpClient,
   ) {}
 
   ngOnInit() {
-    this.questionId = this.route.snapshot.paramMap.get('id')!;
-    
+    this.questionId = this.route.snapshot.paramMap.get("id")!;
+
     this.form = this.fb.group({
-      answerText: ['', [
-        Validators.required,
-        Validators.minLength(10),
-        Validators.maxLength(500)
-      ]]
+      answerText: [
+        "",
+        [
+          Validators.required,
+          Validators.minLength(10),
+          Validators.maxLength(500),
+        ],
+      ],
     });
 
     this.loadQuestion();
@@ -44,29 +47,38 @@ export class AnswerComponent implements OnInit {
       this.question = state.question;
     } else {
       // If not in state, fetch from API
-      this.http.get<any>(`${environment.apiUrl}/classroom/questions/${this.questionId}`)
+      this.http
+        .get<any>(
+          `${environment.apiUrl}/classroom/questions/${this.questionId}`,
+        )
         .subscribe({
           next: (data) => {
             this.question = data;
+            // Format teacher name if not already formatted
+            if (data.teacher) {
+              this.question.teacherName = `${data.teacher.firstName} ${data.teacher.lastName}`;
+            }
           },
           error: (err) => {
-            console.error('Error loading question:', err);
-          }
+            console.error("Error loading question:", err);
+          },
         });
     }
   }
 
   // convenience getter for easy access to form fields
-  get f() { return this.form.controls; }
+  get f() {
+    return this.form.controls;
+  }
 
   submit() {
     this.submitted = true;
 
     if (this.form.invalid) {
       // Scroll to error
-      document.querySelector('.is-invalid')?.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
+      document.querySelector(".is-invalid")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
       });
       return;
     }
@@ -74,26 +86,28 @@ export class AnswerComponent implements OnInit {
     this.submitting = true;
     this.feedback = null;
 
-    this.http.post<any>(
-      `${environment.apiUrl}/classroom/questions/${this.questionId}/answer`,
-      this.form.value
-    ).subscribe({
-      next: res => {
-        this.feedback = res;
-        this.submitting = false;
-        // Scroll to feedback
-        setTimeout(() => {
-          document.querySelector('.feedback-section')?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
-          });
-        }, 100);
-      },
-      error: err => {
-        console.error('Error submitting answer:', err);
-        this.submitting = false;
-      }
-    });
+    this.http
+      .post<any>(
+        `${environment.apiUrl}/classroom/questions/${this.questionId}/answer`,
+        this.form.value,
+      )
+      .subscribe({
+        next: (res) => {
+          this.feedback = res;
+          this.submitting = false;
+          // Scroll to feedback
+          setTimeout(() => {
+            document.querySelector(".feedback-section")?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }, 100);
+        },
+        error: (err) => {
+          console.error("Error submitting answer:", err);
+          this.submitting = false;
+        },
+      });
   }
 
   resetForm() {

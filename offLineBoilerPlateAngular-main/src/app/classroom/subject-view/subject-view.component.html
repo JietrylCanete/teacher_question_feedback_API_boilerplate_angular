@@ -1,0 +1,201 @@
+<div class="subject-view-container">
+  <!-- Header with Back Button -->
+  <div class="mb-4">
+    <button class="back-link" (click)="goBack()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back to Subjects
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-secondary">Loading subject details...</p>
+  </div>
+
+  <div *ngIf="!loading && subject">
+    <!-- Subject Header -->
+    <div class="subject-header-card mb-4">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <div class="d-flex align-items-center mb-2">
+            <span class="badge bg-primary me-3">{{ subject.subjectCode }}</span>
+            <h1 class="h2 mb-0">{{ subject.subjectName }}</h1>
+          </div>
+          <p class="text-secondary mb-2">{{ subject.description || 'No description' }}</p>
+          <div class="d-flex flex-wrap gap-3">
+            <span class="text-secondary">
+              <i class="bi bi-person-circle me-2"></i>
+              Teacher: <strong>{{ subject.teacherName || 'Unknown' }}</strong>
+            </span>
+            <span *ngIf="subject.schedule" class="text-secondary">
+              <i class="bi bi-clock me-2"></i>{{ subject.schedule }}
+            </span>
+            <span *ngIf="subject.room" class="text-secondary">
+              <i class="bi bi-door-open me-2"></i>Room {{ subject.room }}
+            </span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stats-box text-end">
+            <div class="mb-2">
+              <span class="stat-value">{{ subject.studentCount || 0 }}</span>
+              <span class="stat-label">Students</span>
+            </div>
+            <div>
+              <span class="stat-value">{{ subject.questionCount || 0 }}</span>
+              <span class="stat-label">Questions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'questions'" (click)="setActiveTab('questions')">
+          <i class="bi bi-question-circle me-2"></i>Questions
+        </a>
+      </li>
+      <li *ngIf="isTeacher()" class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'students'" (click)="setActiveTab('students')">
+          <i class="bi bi-people me-2"></i>Students
+        </a>
+      </li>
+    </ul>
+
+    <!-- Questions Tab -->
+    <div *ngIf="activeTab === 'questions'">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="h4 mb-0">Subject Questions</h3>
+        <ng-container *ngIf="isTeacher()">
+          <a [routerLink]="['/classroom/create']" [queryParams]="{subjectId: subject?.subjectId}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Create Question
+          </a>
+        </ng-container>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loadingQuestions" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Questions List -->
+      <div *ngIf="!loadingQuestions && questions.length > 0" class="questions-list">
+        <div *ngFor="let question of questions" class="question-item mb-3">
+          <div class="question-card">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
+                <i class="bi bi-question-circle-fill me-1"></i>Question
+              </span>
+              <small class="text-secondary">
+                <i class="bi bi-clock me-1"></i>{{ question.createdAt | date:'medium' }}
+              </small>
+            </div>
+
+            <p class="question-text mb-3">{{ question.questionText }}</p>
+
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-person-circle text-primary me-2"></i>
+                <span class="text-secondary small">By: {{ question.teacherName || 'Teacher' }}</span>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="d-flex gap-2">
+                <ng-container *ngIf="isStudent()">
+                  <button *ngIf="!question.hasAnswered" 
+                          class="btn btn-outline-primary btn-sm"
+                          (click)="answerQuestion(question)">
+                    <i class="bi bi-pencil-square me-1"></i>Answer
+                  </button>
+                  <span *ngIf="question.hasAnswered" 
+                        class="badge bg-success px-3 py-2 rounded-pill">
+                    <i class="bi bi-check-circle-fill me-1"></i>Answered
+                  </span>
+                </ng-container>
+                
+                <ng-container *ngIf="isTeacher()">
+                  <button class="btn btn-outline-info btn-sm"
+                          (click)="viewAnswers(question)">
+                    <i class="bi bi-eye me-1"></i>View Answers
+                  </button>
+                </ng-container>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- No Questions State -->
+      <div *ngIf="!loadingQuestions && questions.length === 0" class="text-center py-5">
+        <div class="empty-state mb-4">
+          <i class="bi bi-question-circle" style="font-size: 4rem; color: #dee2e6;"></i>
+        </div>
+        <h4 class="h5 text-secondary mb-3">No Questions Yet</h4>
+        <ng-container *ngIf="isTeacher()">
+          <p class="text-secondary mb-4">Create your first question for this subject</p>
+          <a [routerLink]="['/classroom/create']" [queryParams]="{subjectId: subject?.subjectId}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-2"></i>Create Question
+          </a>
+        </ng-container>
+        <ng-container *ngIf="isStudent()">
+          <p class="text-secondary mb-4">Check back later for questions from your teacher</p>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- Students Tab (Teacher Only) -->
+    <div *ngIf="activeTab === 'students' && isTeacher()">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="h4 mb-0">Enrolled Students</h3>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="loadingStudents" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Students List -->
+      <div *ngIf="!loadingStudents && students.length > 0" class="students-list">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Enrolled Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let enrollment of students">
+                <td class="align-middle">
+                  <i class="bi bi-person-circle me-2"></i>
+                  {{ enrollment.student?.firstName }} {{ enrollment.student?.lastName }}
+                </td>
+                <td class="align-middle">{{ enrollment.student?.email }}</td>
+                <td class="align-middle">{{ enrollment.enrolledAt | date:'mediumDate' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- No Students State -->
+      <div *ngIf="!loadingStudents && students.length === 0" class="text-center py-5">
+        <div class="empty-state mb-4">
+          <i class="bi bi-people" style="font-size: 4rem; color: #dee2e6;"></i>
+        </div>
+        <h4 class="h5 text-secondary mb-3">No Students Enrolled</h4>
+        <p class="text-secondary mb-4">Students will appear here once they enroll</p>
+      </div>
+    </div>
+  </div>
+</div>

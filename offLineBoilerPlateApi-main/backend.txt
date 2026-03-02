@@ -960,7 +960,7 @@ function model(sequelize) {
 
 ================================================================================
 File: classroom\classroom.controller.js
-Size: 1.21 kB
+Size: 2.27 kB
 ================================================================================
 
 const express = require('express');
@@ -968,32 +968,51 @@ const router = express.Router();
 const authorize = require('_middleware/authorize');
 const classroomService = require('./classroom.service');
 
-
+// Existing routes
 router.post('/questions', authorize(), createQuestion);
 router.get('/questions', authorize(), getQuestions);
 router.post('/questions/:id/answer', authorize(), submitAnswer);
 
+// NEW: Get answers for a specific question (for teachers/admins)
+router.get('/questions/:id/answers', authorize(['Teacher', 'Admin']), getAnswers);
 
+// NEW: Get a single question by ID
+router.get('/questions/:id', authorize(), getQuestionById);
+router.get('/questions/:id/my-answer', authorize(), checkMyAnswer);
 
+function checkMyAnswer(req, res, next) {
+    classroomService.checkMyAnswer(req.params.id, req.user.AccountId)
+        .then(result => res.json(result))
+        .catch(next);
+}
 function createQuestion(req, res, next) {
-    classroomService.createQuestion(req.body.questionText, req.user.AccountId)
+    console.log('Create question request body:', req.body); // Debug log
+    console.log('User ID:', req.user.AccountId); // Debug log
+    
+    classroomService.createQuestion(
+        req.body.questionText, 
+        req.user.AccountId,
+        req.body.subjectId,
+        req.body.dueDate,
+        req.body.points
+    )
         .then(question => res.json(question))
         .catch(next);
 }
 
 function getQuestions(req, res, next) {
-    console.log("STEP 1: Controller reached");
-
-    classroomService.getQuestions()
-        .then(questions => {
-            console.log("STEP 2: Service returned");
-            res.json(questions);
-        })
-        .catch(err => {
-            console.log("STEP 3: Error occurred", err);
-            next(err);
-        });
+    // Pass user ID and role to service
+    classroomService.getQuestions(req.user.AccountId, req.user.role)
+        .then(questions => res.json(questions))
+        .catch(next);
 }
+
+function getQuestionById(req, res, next) {
+    classroomService.getQuestionById(req.params.id)
+        .then(question => question ? res.json(question) : res.sendStatus(404))
+        .catch(next);
+}
+
 function submitAnswer(req, res, next) {
     classroomService.submitAnswer(
         req.params.id,
@@ -1004,12 +1023,21 @@ function submitAnswer(req, res, next) {
         .catch(next);
 }
 
+function getAnswers(req, res, next) {
+    classroomService.getAnswersByQuestionId(
+        req.params.id, 
+        req.user.AccountId, 
+        req.user.role
+    )
+        .then(answers => res.json(answers))
+        .catch(next);
+}
 
 module.exports = router;
 
 ================================================================================
 File: classroom\classroom.service.js
-Size: 1.98 kB
+Size: 7.14 kB
 ================================================================================
 
 const db = require('_helpers/db');
@@ -1018,89 +1046,250 @@ const aiService = require('./ai.service');
 module.exports = {
     createQuestion,
     getQuestions,
+    getQuestionById,
     submitAnswer,
-    getAllQuestions
+    getAnswersByQuestionId,
+    checkMyAnswer
 };
 
-async function getAllQuestions() {
-    return await db.Question.findAll({
-        attributes: ['questionId', 'questionText', 'createdAt'] // adjust fields to match your model
+async function checkMyAnswer(questionId, studentId) {
+    const answer = await db.Answer.findOne({
+        where: {
+            questionId: questionId,
+            studentId: studentId
+        }
+    });
+    
+    return {
+        hasAnswered: !!answer,
+        answer: answer ? {
+            answerId: answer.answerId,
+            answerText: answer.answerText,
+            submittedAt: answer.submittedAt
+        } : null
+    };
+}
+
+async function createQuestion(questionText, teacherId, subjectId, dueDate, points) {
+    // Validate required fields
+    if (!questionText) {
+        throw new Error('Question text is required');
+    }
+    if (!teacherId) {
+        throw new Error('Teacher ID is required');
+    }
+    if (!subjectId) {
+        throw new Error('Subject ID is required');
+    }
+
+    const questionData = { 
+        questionText, 
+        teacherId,
+        subjectId: subjectId, // Make sure this is set
+        createdAt: new Date()
+    };
+    
+    // Add optional fields
+    if (dueDate) {
+        questionData.dueDate = dueDate;
+    }
+    
+    if (points) {
+        questionData.points = points;
+    }
+    
+    console.log('Creating question with data:', questionData);
+    
+    return await db.Question.create(questionData);
+}
+
+async function getQuestions(userId, userRole) {
+    const questions = await db.Question.findAll({ 
+        order: [['createdAt', 'DESC']],
+        include: [{
+            model: db.Account,
+            as: 'teacher',
+            attributes: ['firstName', 'lastName', 'email']
+        }]
+    });
+    
+    // If user is a student or regular user, check which questions they've answered
+    if (userRole === 'Student' || userRole === 'User') {
+        const answeredQuestions = await db.Answer.findAll({
+            where: { studentId: userId },
+            attributes: ['questionId']
+        });
+        
+        const answeredIds = answeredQuestions.map(a => a.questionId);
+        
+        // Add hasAnswered flag and teacher name to each question
+        return questions.map(q => {
+            const question = q.toJSON();
+            question.hasAnswered = answeredIds.includes(q.questionId);
+            
+            // Format teacher name
+            if (question.teacher) {
+                question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+            } else {
+                // Fallback if teacher not found
+                question.teacherName = 'Unknown Teacher';
+            }
+            
+            // Remove the teacher object to keep response clean
+            delete question.teacher;
+            
+            return question;
+        });
+    }
+    
+    // For teachers and admins, just return the questions with teacher info
+    return questions.map(q => {
+        const question = q.toJSON();
+        
+        // Format teacher name
+        if (question.teacher) {
+            question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+        } else {
+            question.teacherName = 'Unknown Teacher';
+        }
+        
+        // Remove the teacher object to keep response clean
+        delete question.teacher;
+        
+        return question;
     });
 }
 
-
-async function createQuestion(questionText, teacherId) {
-    return await db.Question.create({ questionText, teacherId });
-}
-
-async function getQuestions() {
-    return await db.Question.findAll({ order: [['createdAt', 'DESC']] });
+async function getQuestionById(questionId) {
+    const question = await db.Question.findByPk(questionId, {
+        include: [{
+            model: db.Account,
+            as: 'teacher',
+            attributes: ['firstName', 'lastName', 'email']
+        }]
+    });
+    
+    if (question) {
+        const questionData = question.toJSON();
+        
+        // Format teacher name
+        if (questionData.teacher) {
+            questionData.teacherName = `${questionData.teacher.firstName} ${questionData.teacher.lastName}`;
+        } else {
+            questionData.teacherName = 'Unknown Teacher';
+        }
+        
+        // Remove the teacher object to keep response clean
+        delete questionData.teacher;
+        
+        return questionData;
+    }
+    
+    return null;
 }
 
 async function submitAnswer(questionId, studentId, answerText) {
-
-    const answer = await db.Answer.create({
-        questionId,
-        studentId,
-        answerText
-    });
-
+    // Check if question exists
     const question = await db.Question.findByPk(questionId);
+    if (!question) {
+        throw new Error('Question not found');
+    }
 
-    const aiResult = await aiService.reviewAnswer(
-        question.questionText,
-        answerText
-    );
-
-    await db.AIReview.create({
-        answerId: answer.answerId,
-        isRelevant: aiResult.isRelevant,
-        feedback: aiResult.feedback
+    // Check if student has already answered this question
+    const existingAnswer = await db.Answer.findOne({
+        where: {
+            questionId: questionId,
+            studentId: studentId
+        }
     });
 
-    return aiResult;
-}
+    if (existingAnswer) {
+        throw new Error('You have already answered this question. Only one answer per student is allowed.');
+    }
 
-
-/*
-async function submitAnswer(questionId, studentId, answerText) {
-
+    // Save the answer
     const answer = await db.Answer.create({
         questionId,
         studentId,
-        answerText
+        answerText,
+        submittedAt: new Date()
     });
 
+    // Get AI review
     let aiResult = {
-        isRelevant: null,
-        feedback: 'AI review unavailable (billing disabled).'
+        isRelevant: false,
+        feedback: 'AI review unavailable'
     };
 
     try {
-        const question = await db.Question.findByPk(questionId);
-
         aiResult = await aiService.reviewAnswer(
             question.questionText,
             answerText
         );
 
+        // Save AI review
         await db.AIReview.create({
             answerId: answer.answerId,
             isRelevant: aiResult.isRelevant,
-            feedback: aiResult.feedback
+            feedback: aiResult.feedback,
+            reviewedAt: new Date()
         });
-
     } catch (err) {
-        console.error('AI skipped:', err.message);
+        console.error('AI review failed:', err);
     }
 
-    return aiResult;
+    return {
+        ...aiResult,
+        answerId: answer.answerId
+    };
 }
-*/
+
+async function getAnswersByQuestionId(questionId, requestingUserId, requestingUserRole) {
+    // Check if question exists
+    const question = await db.Question.findByPk(questionId);
+    if (!question) {
+        throw new Error('Question not found');
+    }
+
+    let whereClause = { questionId };
+    
+    // If user is a student or regular user, only return their own answer
+    if (requestingUserRole === 'Student' || requestingUserRole === 'User') {
+        whereClause.studentId = requestingUserId;
+    }
+
+    // Get all answers for this question with their AI reviews
+    const answers = await db.Answer.findAll({
+        where: whereClause,
+        include: [{
+            model: db.AIReview,
+            required: false
+        }],
+        order: [['submittedAt', 'DESC']]
+    });
+
+    // Format the answers
+    return answers.map(answer => {
+        const answerData = answer.toJSON();
+        
+        // Format the date
+        if (answerData.submittedAt) {
+            answerData.submittedAt = new Date(answerData.submittedAt).toISOString();
+        }
+        
+        // Ensure AI review is properly formatted
+        if (answerData.AIReview) {
+            answerData.aiReview = answerData.AIReview;
+            delete answerData.AIReview;
+        }
+        
+        return answerData;
+    });
+}
 
 ================================================================================
 File: classroom\question.model.js
-Size: 514 B
+Size: 1.05 kB
 ================================================================================
 
 const { DataTypes } = require('sequelize');
@@ -1110,17 +1299,697 @@ module.exports = model;
 function model(sequelize) {
     const attributes = {
         questionId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        subjectId: { 
+            type: DataTypes.INTEGER, 
+            allowNull: false,
+            references: {
+                model: 'Subjects',
+                key: 'subjectId'
+            }
+        },
         questionText: { type: DataTypes.TEXT, allowNull: false },
-        teacherId: { type: DataTypes.INTEGER, allowNull: false },
+        teacherId: { 
+            type: DataTypes.INTEGER, 
+            allowNull: false,
+            references: {
+                model: 'Accounts',
+                key: 'AccountId'
+            }
+        },
+        dueDate: { type: DataTypes.DATE, allowNull: true },
+        points: { type: DataTypes.INTEGER, defaultValue: 100 },
         createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
     };
 
-    return sequelize.define('Question', attributes, { timestamps: false });
+    const options = {
+        timestamps: false
+    };
+
+    return sequelize.define('Question', attributes, options);
+}
+
+================================================================================
+File: classroom\subject-enrollment.model.js
+Size: 627 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        enrollmentId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        subjectId: { type: DataTypes.INTEGER, allowNull: false },
+        studentId: { type: DataTypes.INTEGER, allowNull: false },
+        enrolledAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        status: { type: DataTypes.ENUM('active', 'completed', 'dropped'), defaultValue: 'active' }
+    };
+
+    return sequelize.define('SubjectEnrollment', attributes, { timestamps: false });
+}
+
+================================================================================
+File: classroom\subject.controller.js
+Size: 3.92 kB
+================================================================================
+
+const express = require('express');
+const router = express.Router();
+const authorize = require('_middleware/authorize');
+const subjectService = require('./subject.service');
+
+// Subject routes
+router.post('/', authorize(['Teacher', 'Admin']), createSubject);
+router.get('/', authorize(), getSubjects);
+router.get('/my-subjects', authorize(), getMySubjects);
+router.get('/:subjectId', authorize(), getSubjectById);
+router.put('/:subjectId', authorize(['Teacher', 'Admin']), updateSubject);
+router.delete('/:subjectId', authorize(['Teacher', 'Admin']), deleteSubject);
+
+// Enrollment routes
+router.post('/:subjectId/enroll', authorize(['Student', 'User']), enrollStudent);
+router.post('/:subjectId/students', authorize(['Teacher', 'Admin']), addStudent);
+router.delete('/:subjectId/students/:studentId', authorize(['Teacher', 'Admin']), removeStudent);
+router.get('/:subjectId/students', authorize(['Teacher', 'Admin']), getSubjectStudents);
+
+// Subject questions
+router.get('/:subjectId/questions', authorize(), getSubjectQuestions);
+
+module.exports = router;
+
+// Controller functions
+function getSubjects(req, res, next) {
+    console.log('GET /subjects called');
+    console.log('User data:', req.user);
+    
+    subjectService.getAll(req.user.AccountId, req.user.role)
+        .then(subjects => {
+            console.log(`Successfully fetched ${subjects.length} subjects`);
+            res.json(subjects);
+        })
+        .catch(error => {
+            console.error('Error in getSubjects:', error);
+            res.status(500).json({ 
+                message: error.message || 'Failed to fetch subjects',
+                error: error.toString()
+            });
+        });
+}
+
+function getMySubjects(req, res, next) {
+    console.log('GET /my-subjects called');
+    subjectService.getMySubjects(req.user.AccountId, req.user.role)
+        .then(subjects => res.json(subjects))
+        .catch(next);
+}
+
+function getSubjectById(req, res, next) {
+    subjectService.getSubjectById(req.params.subjectId, req.user.AccountId, req.user.role)
+        .then(subject => subject ? res.json(subject) : res.sendStatus(404))
+        .catch(next);
+}
+
+function createSubject(req, res, next) {
+    subjectService.createSubject({
+        ...req.body,
+        teacherId: req.user.AccountId
+    })
+        .then(subject => res.json(subject))
+        .catch(next);
+}
+
+function updateSubject(req, res, next) {
+    subjectService.updateSubject(req.params.subjectId, req.body)
+        .then(subject => res.json(subject))
+        .catch(next);
+}
+
+function deleteSubject(req, res, next) {
+    subjectService.deleteSubject(req.params.subjectId)
+        .then(() => res.json({ message: 'Subject deleted successfully' }))
+        .catch(next);
+}
+
+function enrollStudent(req, res, next) {
+    subjectService.enrollStudent(req.params.subjectId, req.user.AccountId)
+        .then(() => res.json({ message: 'Successfully enrolled in subject' }))
+        .catch(next);
+}
+
+function addStudent(req, res, next) {
+    const { studentId } = req.body;
+    subjectService.enrollStudent(req.params.subjectId, studentId)
+        .then(() => res.json({ message: 'Student added to subject successfully' }))
+        .catch(next);
+}
+
+function removeStudent(req, res, next) {
+    subjectService.removeStudent(req.params.subjectId, req.params.studentId)
+        .then(() => res.json({ message: 'Student removed from subject successfully' }))
+        .catch(next);
+}
+
+function getSubjectStudents(req, res, next) {
+    subjectService.getSubjectStudents(req.params.subjectId)
+        .then(students => res.json(students))
+        .catch(next);
+}
+
+function getSubjectQuestions(req, res, next) {
+    subjectService.getSubjectQuestions(req.params.subjectId, req.user.AccountId, req.user.role)
+        .then(questions => res.json(questions))
+        .catch(next);
+}
+
+================================================================================
+File: classroom\subject.model.js
+Size: 889 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        subjectId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        subjectName: { type: DataTypes.STRING, allowNull: false },
+        subjectCode: { type: DataTypes.STRING, allowNull: false, unique: true },
+        description: { type: DataTypes.TEXT, allowNull: true },
+        teacherId: { type: DataTypes.INTEGER, allowNull: false },
+        schedule: { type: DataTypes.STRING, allowNull: true }, // e.g., "Mon/Wed 10:00-11:30"
+        room: { type: DataTypes.STRING, allowNull: true },
+        createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    };
+
+    return sequelize.define('Subject', attributes, { timestamps: true });
+}
+
+================================================================================
+File: classroom\subject.service.js
+Size: 15.41 kB
+================================================================================
+
+const db = require('_helpers/db');
+const { Op } = require('sequelize');
+
+module.exports = {
+    createSubject,
+    getSubjects,
+    getMySubjects,
+    getSubjectById,
+    updateSubject,
+    deleteSubject,
+    enrollStudent,
+    removeStudent,
+    getSubjectStudents,
+    getSubjectQuestions
+};
+
+async function createSubject(params) {
+    // Check if subject code already exists
+    const existingSubject = await db.Subject.findOne({ 
+        where: { subjectCode: params.subjectCode } 
+    });
+    
+    if (existingSubject) {
+        throw new Error(`Subject code "${params.subjectCode}" is already taken`);
+    }
+
+    const subject = new db.Subject(params);
+    await subject.save();
+    
+    return getSubjectById(subject.subjectId);
+}
+
+async function getSubjects(userRole) {
+    // Admins can see all subjects, teachers/students see different views
+    const subjects = await db.Subject.findAll({
+        include: [{
+            model: db.Account,
+            as: 'teacher',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email']
+        }],
+        order: [['createdAt', 'DESC']]
+    });
+
+    return subjects.map(formatSubject);
+}
+
+async function getMySubjects(userId, userRole) {
+    let subjects;
+    
+    if (userRole === 'Teacher' || userRole === 'Admin') {
+        // Teachers see subjects they teach
+        subjects = await db.Subject.findAll({
+            where: { teacherId: userId },
+            include: [{
+                model: db.Account,
+                as: 'teacher',
+                attributes: ['AccountId', 'firstName', 'lastName', 'email']
+            }],
+            order: [['createdAt', 'DESC']]
+        });
+    } else {
+        // Students see subjects they're enrolled in
+        subjects = await db.Subject.findAll({
+            include: [
+                {
+                    model: db.Account,
+                    as: 'teacher',
+                    attributes: ['AccountId', 'firstName', 'lastName', 'email']
+                },
+                {
+                    model: db.SubjectEnrollment,
+                    where: { 
+                        studentId: userId,
+                        status: 'active'
+                    },
+                    required: true
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+    }
+
+    // Add enrollment count for each subject
+    const subjectsWithStats = await Promise.all(subjects.map(async (subject) => {
+        const subjectData = formatSubject(subject);
+        
+        // Get student count
+        const studentCount = await db.SubjectEnrollment.count({
+            where: { 
+                subjectId: subject.subjectId,
+                status: 'active'
+            }
+        });
+        
+        // Get question count
+        const questionCount = await db.Question.count({
+            where: { subjectId: subject.subjectId }
+        });
+        
+        return {
+            ...subjectData,
+            studentCount,
+            questionCount
+        };
+    }));
+
+    return subjectsWithStats;
+}
+
+async function getSubjectById(subjectId, userId, userRole) {
+    const subject = await db.Subject.findByPk(subjectId, {
+        include: [{
+            model: db.Account,
+            as: 'teacher',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email']
+        }]
+    });
+
+    if (!subject) {
+        throw new Error('Subject not found');
+    }
+
+    const subjectData = formatSubject(subject);
+
+    // Check if user is enrolled (for students)
+    if (userRole === 'Student' || userRole === 'User') {
+        const enrollment = await db.SubjectEnrollment.findOne({
+            where: {
+                subjectId: subjectId,
+                studentId: userId,
+                status: 'active'
+            }
+        });
+        subjectData.isEnrolled = !!enrollment;
+    }
+
+    // Get stats
+    subjectData.studentCount = await db.SubjectEnrollment.count({
+        where: { 
+            subjectId: subjectId,
+            status: 'active'
+        }
+    });
+
+    subjectData.questionCount = await db.Question.count({
+        where: { subjectId: subjectId }
+    });
+
+    return subjectData;
+}
+
+async function updateSubject(subjectId, params) {
+    const subject = await db.Subject.findByPk(subjectId);
+    
+    if (!subject) {
+        throw new Error('Subject not found');
+    }
+
+    // Check if subject code is being changed and is unique
+    if (params.subjectCode && params.subjectCode !== subject.subjectCode) {
+        const existingSubject = await db.Subject.findOne({ 
+            where: { subjectCode: params.subjectCode } 
+        });
+        
+        if (existingSubject) {
+            throw new Error(`Subject code "${params.subjectCode}" is already taken`);
+        }
+    }
+
+    Object.assign(subject, params);
+    await subject.save();
+
+    return getSubjectById(subjectId);
+}
+
+async function deleteSubject(subjectId) {
+    const subject = await db.Subject.findByPk(subjectId);
+    
+    if (!subject) {
+        throw new Error('Subject not found');
+    }
+
+    // Check if there are any questions or enrollments
+    const questionCount = await db.Question.count({ where: { subjectId } });
+    const enrollmentCount = await db.SubjectEnrollment.count({ where: { subjectId } });
+
+    if (questionCount > 0 || enrollmentCount > 0) {
+        throw new Error('Cannot delete subject with existing questions or enrollments');
+    }
+
+    await subject.destroy();
+    return { message: 'Subject deleted successfully' };
+}
+
+async function enrollStudent(subjectId, studentId) {
+    const subject = await db.Subject.findByPk(subjectId);
+    
+    if (!subject) {
+        throw new Error('Subject not found');
+    }
+
+    // Check if already enrolled
+    const existingEnrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId,
+            studentId,
+            status: 'active'
+        }
+    });
+
+    if (existingEnrollment) {
+        throw new Error('Student is already enrolled in this subject');
+    }
+
+    // Check if previously dropped/enrolled
+    const previousEnrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId,
+            studentId
+        }
+    });
+
+    if (previousEnrollment) {
+        // Reactivate if previously enrolled
+        previousEnrollment.status = 'active';
+        await previousEnrollment.save();
+    } else {
+        // Create new enrollment
+        await db.SubjectEnrollment.create({
+            subjectId,
+            studentId,
+            enrolledAt: new Date(),
+            status: 'active'
+        });
+    }
+
+    return { message: 'Successfully enrolled in subject' };
+}
+
+async function removeStudent(subjectId, studentId) {
+    const enrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId,
+            studentId,
+            status: 'active'
+        }
+    });
+
+    if (!enrollment) {
+        throw new Error('Student is not enrolled in this subject');
+    }
+
+    enrollment.status = 'dropped';
+    await enrollment.save();
+
+    return { message: 'Student removed from subject successfully' };
+}
+
+async function getSubjectStudents(subjectId) {
+    const enrollments = await db.SubjectEnrollment.findAll({
+        where: { 
+            subjectId,
+            status: 'active'
+        },
+        include: [{
+            model: db.Account,
+            as: 'student',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email']
+        }],
+        order: [['enrolledAt', 'DESC']]
+    });
+
+    return enrollments.map(e => ({
+        enrollmentId: e.enrollmentId,
+        enrolledAt: e.enrolledAt,
+        student: e.student ? {
+            AccountId: e.student.AccountId,
+            firstName: e.student.firstName,
+            lastName: e.student.lastName,
+            email: e.student.email
+        } : null
+    }));
+}
+
+async function getSubjectQuestions(subjectId, userId, userRole) {
+    // Check if user has access to this subject
+    if (userRole === 'Student' || userRole === 'User') {
+        const enrollment = await db.SubjectEnrollment.findOne({
+            where: {
+                subjectId,
+                studentId: userId,
+                status: 'active'
+            }
+        });
+
+        if (!enrollment) {
+            throw new Error('You are not enrolled in this subject');
+        }
+    }
+
+    const questions = await db.Question.findAll({
+        where: { subjectId },
+        include: [{
+            model: db.Account,
+            as: 'teacher',
+            attributes: ['firstName', 'lastName']
+        }],
+        order: [['createdAt', 'DESC']]
+    });
+
+    // If user is a student, check which questions they've answered
+    if (userRole === 'Student' || userRole === 'User') {
+        const answeredQuestions = await db.Answer.findAll({
+            where: { studentId: userId },
+            attributes: ['questionId']
+        });
+        
+        const answeredIds = answeredQuestions.map(a => a.questionId);
+        
+        return questions.map(q => {
+            const question = q.toJSON();
+            question.hasAnswered = answeredIds.includes(q.questionId);
+            
+            if (question.teacher) {
+                question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+                delete question.teacher;
+            }
+            
+            return question;
+        });
+    }
+
+    return questions.map(q => {
+        const question = q.toJSON();
+        if (question.teacher) {
+            question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+            delete question.teacher;
+        }
+        return question;
+    });
+}
+
+// Helper function to format subject
+function formatSubject(subject) {
+    const subjectData = subject.toJSON();
+    
+    if (subjectData.teacher) {
+        subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+        delete subjectData.teacher;
+    }
+    
+    return subjectData;
+}
+async function getAll(userId, userRole) {
+    try {
+        console.log('=== getAll subjects service ===');
+        console.log('Received userId:', userId, 'userRole:', userRole);
+        
+        // First, check if Subjects table has data
+        const subjects = await db.Subject.findAll({
+            include: [{
+                model: db.Account,
+                as: 'teacher',
+                attributes: ['AccountId', 'firstName', 'lastName', 'email']
+            }],
+            order: [['createdAt', 'DESC']]
+        });
+
+        console.log(`Found ${subjects.length} total subjects in database`);
+        
+        if (subjects.length === 0) {
+            console.log('No subjects found in database');
+            return [];
+        }
+
+        // If user is a student, check enrollment status for each subject
+        if (userRole === 'Student' || userRole === 'User') {
+            console.log('User is student, checking enrollments for userId:', userId);
+            
+            const enrollments = await db.SubjectEnrollment.findAll({
+                where: { 
+                    studentId: userId,
+                    status: 'active'
+                },
+                attributes: ['subjectId']
+            });
+            
+            const enrolledSubjectIds = enrollments.map(e => e.subjectId);
+            console.log('Student is enrolled in subject IDs:', enrolledSubjectIds);
+            
+            const result = subjects.map(subject => {
+                const subjectData = subject.toJSON();
+                subjectData.isEnrolled = enrolledSubjectIds.includes(subject.subjectId);
+                
+                if (subjectData.teacher) {
+                    subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+                    delete subjectData.teacher;
+                }
+                
+                return subjectData;
+            });
+            
+            console.log('Returning subjects with enrollment status');
+            return result;
+        }
+
+        // For teachers/admins
+        console.log('User is teacher/admin, returning all subjects without enrollment status');
+        return subjects.map(subject => {
+            const subjectData = subject.toJSON();
+            if (subjectData.teacher) {
+                subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+                delete subjectData.teacher;
+            }
+            return subjectData;
+        });
+    } catch (error) {
+        console.error('ERROR in getAll service:', error);
+        throw new Error(`Failed to fetch subjects: ${error.message}`);
+    }
+}
+
+async function getMySubjects(userId, userRole) {
+    let subjects;
+    
+    if (userRole === 'Teacher' || userRole === 'Admin') {
+        subjects = await db.Subject.findAll({
+            where: { teacherId: userId },
+            include: [{
+                model: db.Account,
+                as: 'teacher',
+                attributes: ['AccountId', 'firstName', 'lastName', 'email']
+            }],
+            order: [['createdAt', 'DESC']]
+        });
+    } else {
+        // Students see subjects they're enrolled in
+        subjects = await db.Subject.findAll({
+            include: [
+                {
+                    model: db.Account,
+                    as: 'teacher',
+                    attributes: ['AccountId', 'firstName', 'lastName', 'email']
+                },
+                {
+                    model: db.SubjectEnrollment,
+                    where: { 
+                        studentId: userId,
+                        status: 'active'
+                    },
+                    required: true,
+                    attributes: []
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+        
+        // Mark all as enrolled since this query only returns enrolled subjects
+        subjects = subjects.map(subject => {
+            const subjectData = subject.toJSON();
+            subjectData.isEnrolled = true;
+            return subjectData;
+        });
+    }
+
+    // Add counts
+    const subjectsWithStats = await Promise.all(subjects.map(async (subject) => {
+        const subjectData = subject.toJSON ? subject.toJSON() : subject;
+        
+        const studentCount = await db.SubjectEnrollment.count({
+            where: { 
+                subjectId: subjectData.subjectId,
+                status: 'active'
+            }
+        });
+        
+        const questionCount = await db.Question.count({
+            where: { subjectId: subjectData.subjectId }
+        });
+        
+        if (subjectData.teacher) {
+            subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+            delete subjectData.teacher;
+        }
+        
+        return {
+            ...subjectData,
+            studentCount,
+            questionCount
+        };
+    }));
+
+    return subjectsWithStats;
 }
 
 ================================================================================
 File: config.json
-Size: 514 B
+Size: 516 B
 ================================================================================
 
 {
@@ -1129,7 +1998,7 @@ Size: 514 B
       "port": 3306,
       "user": "root",   
       "password": "root",
-     "database": "api_backend_boilerplate"
+     "database": "api_backend_boilerplatev2"
   },
   "secret": "secret@#$%&*()_+", 
   "emailFrom": "info@node-mysql-signup-verification-api.com",
@@ -1287,7 +2156,7 @@ https://jasonwatmore.com/post/2020/09/08/nodejs-mysql-boilerplate-api-with-email
 
 ================================================================================
 File: server.js
-Size: 1.26 kB
+Size: 1.34 kB
 ================================================================================
 
 require('rootpath')();
@@ -1319,6 +2188,8 @@ app.use('/accounts', require('./accounts/account.controller'));
 app.use('/api-docs', require('./_helpers/swagger'));
 // Add classroom routes
 app.use('/classroom', require('./classroom/classroom.controller'));
+// Add subject routes
+app.use('/subjects', require('./classroom/subject.controller'));
 
 app.use(errorHandler);
 
@@ -2018,62 +2889,111 @@ components:
 
 ================================================================================
 File: _helpers\db.js
-Size: 1.81 kB
+Size: 3.52 kB
 ================================================================================
 
-    const config = require('config.json');
-    const mysql = require('mysql2/promise');
-    const { Sequelize } = require('sequelize');
+const config = require('config.json');
+const mysql = require('mysql2/promise');
+const { Sequelize } = require('sequelize');
 
-    module.exports = db = {};
+module.exports = db = {};
 
-    initialize();
-    async function initialize() { 
-        const { host, port, user, password, database } = config.database;
-        const connection = await mysql.createConnection({ host, port, user, password });
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
-        
-        await connection.end();
+initialize();
 
-        const sequelize = new Sequelize(database, user, password, { host: 'localhost', dialect: 'mysql' });
+async function initialize() { 
+    const { host, port, user, password, database } = config.database;
+    const connection = await mysql.createConnection({ host, port, user, password });
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
+    
+    await connection.end();
 
-    // Initialize models and add them to the exported `db` object
+    const sequelize = new Sequelize(database, user, password, { 
+        host: 'localhost', 
+        dialect: 'mysql',
+        logging: false // Set to true for debugging
+    });
 
+    // Initialize models
     db.Account = require('../accounts/account.model')(sequelize);
     db.RefreshToken = require('../accounts/refresh-token.model')(sequelize);
     db.Preferences = require('../models/preferences.model')(sequelize);
     db.ActivityLog = require('../models/activitylog.model')(sequelize);
 
+    // Classroom models
+    db.Question = require('../classroom/question.model')(sequelize);
+    db.Answer = require('../classroom/answer.model')(sequelize);
+    db.AIReview = require('../classroom/ai-review.model')(sequelize);
+
+    // Define relationships
     db.Account.hasMany(db.RefreshToken, { foreignKey: 'AccountId', onDelete: 'CASCADE' });
     db.RefreshToken.belongsTo(db.Account, { foreignKey: 'AccountId' });
 
     db.ActivityLog.belongsTo(db.Account, { foreignKey: 'AccountId' });
     db.Preferences.belongsTo(db.Account, { foreignKey: 'AccountId' });
 
-    db.Question = require('../classroom/question.model')(sequelize);
-    db.Answer = require('../classroom/answer.model')(sequelize);
-    db.AIReview = require('../classroom/ai-review.model')(sequelize);
-
-    // Associations
+    // Classroom relationships
     db.Question.hasMany(db.Answer, { foreignKey: 'questionId' });
     db.Answer.belongsTo(db.Question, { foreignKey: 'questionId' });
 
     db.Answer.hasOne(db.AIReview, { foreignKey: 'answerId' });
     db.AIReview.belongsTo(db.Answer, { foreignKey: 'answerId' });
+    // Add this to the relationships section in initialize() function
+    // Add teacher relationship
+    db.Account.hasMany(db.Question, { foreignKey: 'teacherId', as: 'questions' });
+    db.Question.belongsTo(db.Account, { foreignKey: 'teacherId', as: 'teacher' });
+    // Add these to your relationships section
+    // Subject relationships
+    db.Subject = require('../classroom/subject.model')(sequelize);
+    db.SubjectEnrollment = require('../classroom/subject-enrollment.model')(sequelize);
+    // Subject relationships
+    db.Account.hasMany(db.Subject, { foreignKey: 'teacherId', as: 'taughtSubjects' });
+    db.Subject.belongsTo(db.Account, { foreignKey: 'teacherId', as: 'teacher' });
+    // Enrollment relationships
+    db.Subject.belongsToMany(db.Account, { 
+    through: db.SubjectEnrollment, 
+    foreignKey: 'subjectId', 
+    otherKey: 'studentId',
+    as: 'students'
+    });
+    db.Account.belongsToMany(db.Subject, { 
+    through: db.SubjectEnrollment, 
+    foreignKey: 'studentId', 
+    otherKey: 'subjectId',
+    as: 'enrolledSubjects' 
+    });
+    db.Subject.hasMany(db.SubjectEnrollment, { foreignKey: 'subjectId' });
+    db.SubjectEnrollment.belongsTo(db.Subject, { foreignKey: 'subjectId' });
+    db.Account.hasMany(db.SubjectEnrollment, { foreignKey: 'studentId' });
+    db.SubjectEnrollment.belongsTo(db.Account, { foreignKey: 'studentId', as: 'student' });
 
+    // Update Question relationships
+    db.Subject.hasMany(db.Question, { foreignKey: 'subjectId' });
+    db.Question.belongsTo(db.Subject, { foreignKey: 'subjectId' });
+
+
+
+
+
+
+
+
+    // Sync all models with database
     await sequelize.sync({ alter: true });
+    
+    console.log('Database synchronized successfully');
 }
-
 
 ================================================================================
 File: _helpers\role.js
-Size: 77 B
+Size: 126 B
 ================================================================================
 
 module.exports = {
     Admin: 'Admin',
+    Teacher: 'Teacher',
+    Student: 'Student',
+    User: 'User',
     Staff: 'Staff',
-    User: 'User'
 }
 
 ================================================================================

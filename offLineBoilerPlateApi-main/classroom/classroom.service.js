@@ -6,25 +6,144 @@ module.exports = {
     getQuestions,
     getQuestionById,
     submitAnswer,
-    getAnswersByQuestionId
+    getAnswersByQuestionId,
+    checkMyAnswer
 };
 
-async function createQuestion(questionText, teacherId) {
-    return await db.Question.create({ 
-        questionText, 
-        teacherId,
-        createdAt: new Date()
+async function checkMyAnswer(questionId, studentId) {
+    const answer = await db.Answer.findOne({
+        where: {
+            questionId: questionId,
+            studentId: studentId
+        }
     });
+    
+    return {
+        hasAnswered: !!answer,
+        answer: answer ? {
+            answerId: answer.answerId,
+            answerText: answer.answerText,
+            submittedAt: answer.submittedAt
+        } : null
+    };
 }
 
-async function getQuestions() {
-    return await db.Question.findAll({ 
-        order: [['createdAt', 'DESC']] 
+async function createQuestion(questionText, teacherId, subjectId, dueDate, points) {
+    // Validate required fields
+    if (!questionText) {
+        throw new Error('Question text is required');
+    }
+    if (!teacherId) {
+        throw new Error('Teacher ID is required');
+    }
+    if (!subjectId) {
+        throw new Error('Subject ID is required');
+    }
+
+    const questionData = { 
+        questionText, 
+        teacherId,
+        subjectId: subjectId, // Make sure this is set
+        createdAt: new Date()
+    };
+    
+    // Add optional fields
+    if (dueDate) {
+        questionData.dueDate = dueDate;
+    }
+    
+    if (points) {
+        questionData.points = points;
+    }
+    
+    console.log('Creating question with data:', questionData);
+    
+    return await db.Question.create(questionData);
+}
+
+async function getQuestions(userId, userRole) {
+    const questions = await db.Question.findAll({ 
+        order: [['createdAt', 'DESC']],
+        include: [{
+            model: db.Account,
+            as: 'teacher',
+            attributes: ['firstName', 'lastName', 'email']
+        }]
+    });
+    
+    // If user is a student or regular user, check which questions they've answered
+    if (userRole === 'Student' || userRole === 'User') {
+        const answeredQuestions = await db.Answer.findAll({
+            where: { studentId: userId },
+            attributes: ['questionId']
+        });
+        
+        const answeredIds = answeredQuestions.map(a => a.questionId);
+        
+        // Add hasAnswered flag and teacher name to each question
+        return questions.map(q => {
+            const question = q.toJSON();
+            question.hasAnswered = answeredIds.includes(q.questionId);
+            
+            // Format teacher name
+            if (question.teacher) {
+                question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+            } else {
+                // Fallback if teacher not found
+                question.teacherName = 'Unknown Teacher';
+            }
+            
+            // Remove the teacher object to keep response clean
+            delete question.teacher;
+            
+            return question;
+        });
+    }
+    
+    // For teachers and admins, just return the questions with teacher info
+    return questions.map(q => {
+        const question = q.toJSON();
+        
+        // Format teacher name
+        if (question.teacher) {
+            question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+        } else {
+            question.teacherName = 'Unknown Teacher';
+        }
+        
+        // Remove the teacher object to keep response clean
+        delete question.teacher;
+        
+        return question;
     });
 }
 
 async function getQuestionById(questionId) {
-    return await db.Question.findByPk(questionId);
+    const question = await db.Question.findByPk(questionId, {
+        include: [{
+            model: db.Account,
+            as: 'teacher',
+            attributes: ['firstName', 'lastName', 'email']
+        }]
+    });
+    
+    if (question) {
+        const questionData = question.toJSON();
+        
+        // Format teacher name
+        if (questionData.teacher) {
+            questionData.teacherName = `${questionData.teacher.firstName} ${questionData.teacher.lastName}`;
+        } else {
+            questionData.teacherName = 'Unknown Teacher';
+        }
+        
+        // Remove the teacher object to keep response clean
+        delete questionData.teacher;
+        
+        return questionData;
+    }
+    
+    return null;
 }
 
 async function submitAnswer(questionId, studentId, answerText) {
@@ -32,6 +151,18 @@ async function submitAnswer(questionId, studentId, answerText) {
     const question = await db.Question.findByPk(questionId);
     if (!question) {
         throw new Error('Question not found');
+    }
+
+    // Check if student has already answered this question
+    const existingAnswer = await db.Answer.findOne({
+        where: {
+            questionId: questionId,
+            studentId: studentId
+        }
+    });
+
+    if (existingAnswer) {
+        throw new Error('You have already answered this question. Only one answer per student is allowed.');
     }
 
     // Save the answer
@@ -71,16 +202,23 @@ async function submitAnswer(questionId, studentId, answerText) {
     };
 }
 
-async function getAnswersByQuestionId(questionId) {
+async function getAnswersByQuestionId(questionId, requestingUserId, requestingUserRole) {
     // Check if question exists
     const question = await db.Question.findByPk(questionId);
     if (!question) {
         throw new Error('Question not found');
     }
 
+    let whereClause = { questionId };
+    
+    // If user is a student or regular user, only return their own answer
+    if (requestingUserRole === 'Student' || requestingUserRole === 'User') {
+        whereClause.studentId = requestingUserId;
+    }
+
     // Get all answers for this question with their AI reviews
     const answers = await db.Answer.findAll({
-        where: { questionId },
+        where: whereClause,
         include: [{
             model: db.AIReview,
             required: false

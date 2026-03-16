@@ -71,6 +71,10 @@ export class SubjectService {
     getSubjectQuestions(subjectId: number): Observable<any[]> {
         return this.http.get<any[]>(`${baseUrl}/${subjectId}/questions`);
     }
+
+    getSubjectQuizzes(subjectId: number): Observable<any[]> {
+        return this.http.get<any[]>(`${baseUrl}/${subjectId}/quizzes`);
+    }
     // Add these methods to the SubjectService class
     getPendingStudents(subjectId: number): Observable<any[]> {
         return this.http.get<any[]>(`${baseUrl}/${subjectId}/pending-students`);

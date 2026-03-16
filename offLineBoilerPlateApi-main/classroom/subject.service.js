@@ -524,7 +524,71 @@ module.exports = {
     removeStudent,
     getSubjectStudents,
     getSubjectQuestions,
+    getSubjectQuizzes,
     approveStudent,
     rejectStudent,
     getPendingStudents
 };
+
+async function getSubjectQuizzes(subjectId, userId, userRole) {
+    // Students/users must be enrolled to view quizzes in the subject
+    if (userRole === 'Student' || userRole === 'User') {
+        const enrollment = await db.SubjectEnrollment.findOne({
+            where: {
+                subjectId,
+                studentId: userId,
+                status: 'active'
+            }
+        });
+        if (!enrollment) {
+            throw new Error('You are not enrolled in this subject');
+        }
+    }
+
+    const quizzes = await db.Quiz.findAll({
+        where: { subjectId },
+        order: [['createdAt', 'DESC']]
+    });
+
+    // For students/users, mark quizzes they have already submitted
+    if (userRole === 'Student' || userRole === 'User') {
+        const quizIds = quizzes.map(q => q.quizId);
+        if (!quizIds.length) {
+            return quizzes.map(q => q.toJSON());
+        }
+
+        const quizQuestions = await db.Question.findAll({
+            where: { quizId: quizIds },
+            attributes: ['quizId', 'questionId']
+        });
+
+        const questionIds = quizQuestions.map(q => q.questionId);
+        if (!questionIds.length) {
+            return quizzes.map(q => q.toJSON());
+        }
+
+        const answered = await db.Answer.findAll({
+            where: {
+                studentId: userId,
+                questionId: questionIds
+            },
+            attributes: ['questionId']
+        });
+
+        const answeredQuestionIds = new Set(answered.map(a => a.questionId));
+        const submittedQuizIds = new Set(
+            quizQuestions
+                .filter(q => answeredQuestionIds.has(q.questionId))
+                .map(q => q.quizId)
+        );
+
+        return quizzes.map(q => {
+            const data = q.toJSON();
+            data.hasSubmitted = submittedQuizIds.has(q.quizId);
+            return data;
+        });
+    }
+
+    // Teachers/admins: just return quizzes
+    return quizzes.map(q => q.toJSON());
+}

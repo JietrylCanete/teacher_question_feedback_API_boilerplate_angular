@@ -107,21 +107,29 @@ export class CreateQuizComponent implements OnInit {
     }
 
     const raw = this.form.value;
-    const questionsPayload = raw.questions.map((q: any) => {
-      const options: string[] = (q.options || [])
-        .map((o: string) => (o || '').trim())
-        .filter((o: string) => o.length > 0);
+    const questionsPayload = raw.questions
+      .map((q: any) => {
+        const options: string[] = (q.options || [])
+          .map((o: string) => (o || '').trim())
+          .filter((o: string) => o.length > 0);
 
-      return {
-        questionText: q.questionText,
-        options,
-        correctAnswer: q.correctAnswer,
-        points: q.points || 1
-      };
-    }).filter((q: any) => q.questionText && q.options.length >= 2);
+        return {
+          questionText: q.questionText,
+          options,
+          correctAnswer: q.correctAnswer,
+          points: q.points || 1
+        };
+      })
+      .filter((q: any) => {
+        // Keep if question text + at least 2 options
+        if (q.questionText && q.options.length >= 2) return true;
+        // Or keep if question text + correctAnswer and no options (AI will generate options)
+        if (q.questionText && q.correctAnswer && q.options.length === 0) return true;
+        return false;
+      });
 
     if (questionsPayload.length === 0) {
-      this.alertService.error('Please add at least one valid question with two options.');
+      this.alertService.error('Please add at least one question. Provide either two or more options, or just a correct answer to let AI generate options.');
       return;
     }
 

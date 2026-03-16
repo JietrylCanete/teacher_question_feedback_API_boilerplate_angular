@@ -20,6 +20,7 @@ router.get('/questions/:id/my-answer', authorize(), checkMyAnswer);
 router.post('/quizzes', authorize(['Teacher', 'Admin']), createQuiz);
 router.get('/quizzes/:id', authorize(), getQuiz);
 router.post('/quizzes/:id/answers', authorize(['Student', 'User']), submitQuizAnswers);
+router.get('/quizzes/:id/results', authorize(['Teacher', 'Admin']), getQuizResults);
 
 function checkMyAnswer(req, res, next) {
     classroomService.checkMyAnswer(req.params.id, req.user.AccountId)
@@ -91,6 +92,12 @@ function getQuiz(req, res, next) {
 function submitQuizAnswers(req, res, next) {
     quizService.submitQuizAnswers(req.params.id, req.user.AccountId, req.body)
         .then(result => res.json(result))
+        .catch(next);
+}
+
+function getQuizResults(req, res, next) {
+    quizService.getQuizResults(req.params.id)
+        .then(results => res.json(results))
         .catch(next);
 }
 

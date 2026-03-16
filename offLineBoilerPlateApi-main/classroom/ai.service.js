@@ -90,4 +90,42 @@ Feedback: One short sentence explaining why.
     };
   }
 }
-module.exports = { reviewAnswer, checkQuestionRelevance  };
+
+async function generateMcqOptions(questionText, correctAnswer) {
+  const prompt = `
+You are helping a teacher create a multiple choice question.
+
+Question:
+"${questionText}"
+
+Correct answer:
+"${correctAnswer}"
+
+Generate 3 plausible but incorrect distractor options that are short (max 5 words each).
+Respond using this exact format (one line per option):
+
+Option1: ...
+Option2: ...
+Option3: ...
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+
+    const options = [];
+    const regex = /Option\d+\s*:\s*(.+)/gi;
+    let match;
+    while ((match = regex.exec(raw)) !== null) {
+      const opt = match[1].trim();
+      if (opt) options.push(opt);
+    }
+
+    return options;
+  } catch (err) {
+    console.error("Gemini AI Error (generate MCQ options):", err);
+    return [];
+  }
+}
+
+module.exports = { reviewAnswer, checkQuestionRelevance, generateMcqOptions };

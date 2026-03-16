@@ -19,6 +19,7 @@ router.get('/:subjectId/students', authorize(['Teacher', 'Admin']), getSubjectSt
 
 // Subject questions
 router.get('/:subjectId/questions', authorize(), getSubjectQuestions);
+router.get('/:subjectId/quizzes', authorize(), getSubjectQuizzes);
 
 // Teacher approval routes
 router.get('/:subjectId/pending-students', authorize(['Teacher', 'Admin']), getPendingStudents);
@@ -108,6 +109,12 @@ function getSubjectStudents(req, res, next) {
 function getSubjectQuestions(req, res, next) {
     subjectService.getSubjectQuestions(req.params.subjectId, req.user.AccountId, req.user.role)
         .then(questions => res.json(questions))
+        .catch(next);
+}
+
+function getSubjectQuizzes(req, res, next) {
+    subjectService.getSubjectQuizzes(req.params.subjectId, req.user.AccountId, req.user.role)
+        .then(quizzes => res.json(quizzes))
         .catch(next);
 }
 

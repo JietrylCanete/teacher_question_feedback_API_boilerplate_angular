@@ -14,6 +14,7 @@ export class SubjectViewComponent implements OnInit {
   subjectId!: number;
   subject: any = null;
   questions: any[] = [];
+  quizzes: any[] = [];
   students: any[] = [];
   account: Account | null;
   pendingStudents: any[] = [];
@@ -24,6 +25,7 @@ export class SubjectViewComponent implements OnInit {
   loading = true;
   loadingQuestions = true;
   loadingStudents = true;
+  loadingQuizzes = true;
 
   constructor(
     private route: ActivatedRoute,
@@ -46,6 +48,7 @@ export class SubjectViewComponent implements OnInit {
     
     this.loadSubject();
     this.loadQuestions();
+    this.loadQuizzes();
     
     if (this.isTeacher()) {
       this.loadStudents();
@@ -127,6 +130,22 @@ export class SubjectViewComponent implements OnInit {
       });
   }
 
+  loadQuizzes() {
+    this.loadingQuizzes = true;
+    this.subjectService.getSubjectQuizzes(this.subjectId)
+      .pipe(first())
+      .subscribe({
+        next: (quizzes: any[]) => {
+          this.quizzes = quizzes;
+          this.loadingQuizzes = false;
+        },
+        error: (error: any) => {
+          this.alertService.error(error);
+          this.loadingQuizzes = false;
+        }
+      });
+  }
+
   loadStudents() {
     this.loadingStudents = true;
     this.subjectService.getStudents(this.subjectId)
@@ -162,6 +181,12 @@ export class SubjectViewComponent implements OnInit {
   answerQuestion(question: any) {
     this.router.navigate(['/classroom', question.questionId], {
       state: { question: question, subject: this.subject }
+    });
+  }
+
+  takeQuiz(quiz: any) {
+    this.router.navigate(['/classroom/quiz', quiz.quizId, 'take'], {
+      state: { quiz }
     });
   }
 

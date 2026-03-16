@@ -10,6 +10,7 @@ import { CreateQuestionComponent } from './create-question.component';
 import { ViewAnswersComponent } from './view-answers/view-answers.component';
 import { CreateQuizComponent } from './create-quiz.component';
 import { TakeQuizComponent } from './take-quiz.component';
+import { QuizResultsComponent } from './quiz-results.component';
 
 const routes: Routes = [
   { 
@@ -49,6 +50,12 @@ const routes: Routes = [
     component: TakeQuizComponent,
     canActivate: [AuthGuard],
     data: { roles: ['User', 'Student'] }
+  },
+  {
+    path: 'quiz/:id/results',
+    component: QuizResultsComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['Teacher', 'Admin'] }
   },
   { 
     path: 'view/:id', 

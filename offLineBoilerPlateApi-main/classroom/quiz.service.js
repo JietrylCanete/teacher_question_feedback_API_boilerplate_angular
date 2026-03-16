@@ -1,9 +1,11 @@
 const db = require('_helpers/db');
+const aiService = require('./ai.service');
 
 module.exports = {
     createQuiz,
     getQuizById,
-    submitQuizAnswers
+    submitQuizAnswers,
+    getQuizResults
 };
 
 async function createQuiz(teacherId, quizData) {
@@ -29,8 +31,16 @@ async function createQuiz(teacherId, quizData) {
     // Create questions linked to this quiz
     for (const q of questions) {
         if (!q.questionText) continue;
-        const options = Array.isArray(q.options) ? q.options.filter(o => !!o) : [];
+
+        let options = Array.isArray(q.options) ? q.options.filter(o => !!o) : [];
         const points = q.points || 1;
+
+        // If teacher did not provide options, use AI to generate distractors
+        if (options.length === 0 && q.correctAnswer) {
+            const aiOptions = await aiService.generateMcqOptions(q.questionText, q.correctAnswer);
+            options = [q.correctAnswer, ...aiOptions];
+        }
+
         totalPoints += points;
 
         const questionData = {
@@ -100,6 +110,19 @@ async function submitQuizAnswers(quizId, studentId, payload) {
         throw new Error('answers must be an array');
     }
 
+    // Prevent multiple submissions: if the student has already answered
+    // any question in this quiz, block a new submission
+    const quizQuestionIds = questions.map(q => q.questionId);
+    const existing = await db.Answer.findOne({
+        where: {
+            questionId: quizQuestionIds,
+            studentId
+        }
+    });
+    if (existing) {
+        throw new Error('You have already submitted this quiz.');
+    }
+
     const answersByQuestionId = new Map();
     for (const a of payload.answers) {
         if (!a.questionId) continue;
@@ -155,6 +178,46 @@ async function submitQuizAnswers(quizId, studentId, payload) {
         totalScore,
         maxScore,
         results
+    };
+}
+
+async function getQuizResults(quizId) {
+    const quiz = await db.Quiz.findByPk(quizId, {
+        include: [db.Question]
+    });
+
+    if (!quiz) {
+        throw new Error('Quiz not found');
+    }
+
+    const questions = quiz.Questions || [];
+    const questionIds = questions.map(q => q.questionId);
+
+    const answers = await db.Answer.findAll({
+        where: { questionId: questionIds },
+        include: [{
+            model: db.Account,
+            as: 'student',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email']
+        }],
+        order: [['submittedAt', 'DESC']]
+    });
+
+    return {
+        quiz: quiz.toJSON(),
+        questions: questions.map(q => q.toJSON()),
+        answers: answers.map(a => {
+            const data = a.toJSON();
+            if (data.student) {
+                data.student = {
+                    AccountId: data.student.AccountId,
+                    firstName: data.student.firstName,
+                    lastName: data.student.lastName,
+                    email: data.student.email
+                };
+            }
+            return data;
+        })
     };
 }
 

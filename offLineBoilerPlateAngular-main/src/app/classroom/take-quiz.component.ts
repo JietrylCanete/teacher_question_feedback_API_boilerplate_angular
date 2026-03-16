@@ -17,6 +17,7 @@ export class TakeQuizComponent implements OnInit {
   submitting = false;
   submitted = false;
   result: any = null;
+  errorMessage: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -74,6 +75,7 @@ export class TakeQuizComponent implements OnInit {
 
     this.submitting = true;
     this.result = null;
+    this.errorMessage = null;
     const payload = this.form.value.answers;
 
     this.quizService.submitQuizAnswers(this.quizId, payload)
@@ -86,14 +88,21 @@ export class TakeQuizComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error submitting quiz answers', err);
-          this.alertService.error(err?.error?.message || 'Failed to submit quiz');
+          const msg = err?.error?.message || 'Failed to submit quiz';
+          this.errorMessage = msg;
+          this.alertService.error(msg);
           this.submitting = false;
         }
       });
   }
 
   cancel(): void {
-    this.router.navigate(['/classroom']);
+    const subjectId = this.route.snapshot.queryParamMap.get('subjectId');
+    if (subjectId) {
+      this.router.navigate(['/classroom/subject', subjectId]);
+    } else {
+      this.router.navigate(['/classroom']);
+    }
   }
 }
 

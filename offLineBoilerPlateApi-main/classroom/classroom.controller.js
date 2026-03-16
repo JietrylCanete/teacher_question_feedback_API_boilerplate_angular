@@ -29,7 +29,9 @@ function createQuestion(req, res, next) {
         req.user.AccountId,
         req.body.subjectId,
         req.body.dueDate,
-        req.body.points
+        req.body.points,
+        req.body.type,
+        req.body.options
     )
         .then(question => res.json(question))
         .catch(next);

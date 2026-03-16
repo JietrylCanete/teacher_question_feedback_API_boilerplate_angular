@@ -14,6 +14,17 @@ function model(sequelize) {
             }
         },
         questionText: { type: DataTypes.TEXT, allowNull: false },
+        // Question type (e.g. ESSAY, MCQ)
+        type: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: 'ESSAY'
+        },
+        // Optional serialized options for types like MCQ
+        options: {
+            type: DataTypes.TEXT,
+            allowNull: true
+        },
         teacherId: { 
             type: DataTypes.INTEGER, 
             allowNull: false,

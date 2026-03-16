@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { first } from 'rxjs/operators';
 import { environment } from '@environments/environment';
@@ -38,6 +38,7 @@ export class CreateQuestionComponent implements OnInit {
 
     this.form = this.formBuilder.group({
       subjectId: [this.subjectId || '', Validators.required],
+      type: ['ESSAY', Validators.required],
       questionText: ['', [
         Validators.required,
         Validators.minLength(10),
@@ -86,6 +87,20 @@ export class CreateQuestionComponent implements OnInit {
   // convenience getter for easy access to form fields
   get f() { return this.form.controls; }
 
+  get mcqOptionsArray(): FormArray {
+    let control = this.form.get('options') as FormArray | null;
+    if (!control) {
+      control = this.formBuilder.array([
+        this.formBuilder.control(''),
+        this.formBuilder.control(''),
+        this.formBuilder.control(''),
+        this.formBuilder.control(''),
+      ]);
+      this.form.addControl('options', control);
+    }
+    return control;
+  }
+
   // Add this method to get the selected subject name for display
   getSelectedSubjectName(): string {
     const selectedId = this.form?.get('subjectId')?.value;
@@ -115,7 +130,13 @@ onSubmit() {
   
   const requestData = {
     questionText: formValue.questionText,
+    type: formValue.type,
     subjectId: Number(formValue.subjectId),
+    options: formValue.type === 'MCQ'
+      ? this.mcqOptionsArray.value
+          .map((o: string) => (o || '').trim())
+          .filter((o: string) => o.length > 0)
+      : null,
     dueDate: formValue.dueDate || null,
     points: formValue.points || 100
   };

@@ -43,6 +43,9 @@ async function initialize() {
 
     db.Answer.hasOne(db.AIReview, { foreignKey: 'answerId' });
     db.AIReview.belongsTo(db.Answer, { foreignKey: 'answerId' });
+    // Student relationships for answers
+    db.Account.hasMany(db.Answer, { foreignKey: 'studentId', as: 'answers' });
+    db.Answer.belongsTo(db.Account, { foreignKey: 'studentId', as: 'student' });
     // Add this to the relationships section in initialize() function
     // Add teacher relationship
     db.Account.hasMany(db.Question, { foreignKey: 'teacherId', as: 'questions' });

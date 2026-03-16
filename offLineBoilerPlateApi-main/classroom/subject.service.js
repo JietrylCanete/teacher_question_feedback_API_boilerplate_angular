@@ -20,9 +20,6 @@ async function createSubject(params) {
 
 async function getAll(userId, userRole) {
     try {
-        //console.log('=== getAll subjects service ===');
-        //console.log('Received userId:', userId, 'userRole:', userRole);
-        
         // First, check if Subjects table has data
         const subjects = await db.Subject.findAll({
             include: [{
@@ -33,68 +30,96 @@ async function getAll(userId, userRole) {
             order: [['createdAt', 'DESC']]
         });
 
-        //console.log(`Found ${subjects.length} total subjects in database`);
-        
         if (subjects.length === 0) {
-            //console.log('No subjects found in database');
             return [];
         }
 
-// If user is a student, check enrollment status for each subject
-if (userRole === 'Student' || userRole === 'User') {
-    //console.log('User is student, checking enrollments for userId:', userId);
-    
-    // Get active (approved) enrollments
-    const activeEnrollments = await db.SubjectEnrollment.findAll({
-        where: { 
-            studentId: userId,
-            status: 'active'
-        },
-        attributes: ['subjectId']
-    });
-    
-    // Get pending enrollments
-    const pendingEnrollments = await db.SubjectEnrollment.findAll({
-        where: { 
-            studentId: userId,
-            status: 'pending'
-        },
-        attributes: ['subjectId']
-    });
-    
-    const activeSubjectIds = activeEnrollments.map(e => e.subjectId);
-    const pendingSubjectIds = pendingEnrollments.map(e => e.subjectId);
-    
-    //console.log('Active subjects:', activeSubjectIds);
-    //console.log('Pending subjects:', pendingSubjectIds);
-    
-    const result = subjects.map(subject => {
-        const subjectData = subject.toJSON();
-        subjectData.isEnrolled = activeSubjectIds.includes(subject.subjectId);
-        subjectData.isPending = pendingSubjectIds.includes(subject.subjectId);
-        
-        if (subjectData.teacher) {
-            subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
-            delete subjectData.teacher;
-        }
-        
-        return subjectData;
-    });
-    
-    //console.log('Returning subjects with enrollment status');
-    return result;
-}
+        // If user is a student, check enrollment status for each subject
+        if (userRole === 'Student' || userRole === 'User') {
+            // Get active (approved) enrollments
+            const activeEnrollments = await db.SubjectEnrollment.findAll({
+                where: { 
+                    studentId: userId,
+                    status: 'active'
+                },
+                attributes: ['subjectId']
+            });
+            
+            // Get pending enrollments
+            const pendingEnrollments = await db.SubjectEnrollment.findAll({
+                where: { 
+                    studentId: userId,
+                    status: 'pending'
+                },
+                attributes: ['subjectId']
+            });
+            
+            const activeSubjectIds = activeEnrollments.map(e => e.subjectId);
+            const pendingSubjectIds = pendingEnrollments.map(e => e.subjectId);
+            
+            const baseResult = subjects.map(subject => {
+                const subjectData = subject.toJSON();
+                subjectData.isEnrolled = activeSubjectIds.includes(subject.subjectId);
+                subjectData.isPending = pendingSubjectIds.includes(subject.subjectId);
+                
+                if (subjectData.teacher) {
+                    subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+                    delete subjectData.teacher;
+                }
+                
+                return subjectData;
+            });
 
-        // For teachers/admins
-        //console.log('User is teacher/admin, returning all subjects without enrollment status');
-        return subjects.map(subject => {
+            // Add student/question counts for each subject
+            const withStats = await Promise.all(baseResult.map(async (subjectData) => {
+                const studentCount = await db.SubjectEnrollment.count({
+                    where: { 
+                        subjectId: subjectData.subjectId,
+                        status: 'active'
+                    }
+                });
+                
+                const questionCount = await db.Question.count({
+                    where: { subjectId: subjectData.subjectId }
+                });
+
+                return {
+                    ...subjectData,
+                    studentCount,
+                    questionCount
+                };
+            }));
+
+            return withStats;
+        }
+
+        // For teachers/admins, also include student/question counts
+        const teacherResult = await Promise.all(subjects.map(async (subject) => {
             const subjectData = subject.toJSON();
             if (subjectData.teacher) {
                 subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
                 delete subjectData.teacher;
             }
-            return subjectData;
-        });
+
+            const studentCount = await db.SubjectEnrollment.count({
+                where: { 
+                    subjectId: subjectData.subjectId,
+                    status: 'active'
+                }
+            });
+            
+            const questionCount = await db.Question.count({
+                where: { subjectId: subjectData.subjectId }
+            });
+
+            return {
+                ...subjectData,
+                studentCount,
+                questionCount
+            };
+        }));
+
+        return teacherResult;
     } catch (error) {
         //console.error('ERROR in getAll service:', error);
         throw new Error(`Failed to fetch subjects: ${error.message}`);

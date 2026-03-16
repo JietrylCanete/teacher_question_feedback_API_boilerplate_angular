@@ -13,6 +13,7 @@ export class AnswerComponent implements OnInit {
   questionId!: string;
   question: any = null;
   feedback: any = null;
+  errorMessage: string | null = null;
   submitting = false;
   submitted = false;
 
@@ -30,9 +31,7 @@ export class AnswerComponent implements OnInit {
       answerText: [
         "",
         [
-          Validators.required,
-          Validators.minLength(10),
-          Validators.maxLength(500),
+          Validators.required
         ],
       ],
     });
@@ -44,7 +43,7 @@ export class AnswerComponent implements OnInit {
     // First try to get from state
     const state = history.state;
     if (state && state.question) {
-      this.question = state.question;
+      this.question = this.normalizeQuestion(state.question);
     } else {
       // If not in state, fetch from API
       this.http
@@ -53,17 +52,53 @@ export class AnswerComponent implements OnInit {
         )
         .subscribe({
           next: (data) => {
-            this.question = data;
-            // Format teacher name if not already formatted
-            if (data.teacher) {
-              this.question.teacherName = `${data.teacher.firstName} ${data.teacher.lastName}`;
-            }
+            this.question = this.normalizeQuestion(data);
           },
           error: (err) => {
             console.error("Error loading question:", err);
           },
         });
     }
+  }
+
+  private normalizeQuestion(raw: any) {
+    const question = { ...raw };
+
+    // Format teacher name if teacher object exists
+    if (question.teacher && !question.teacherName) {
+      question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+    }
+
+    // Ensure type has a sensible default
+    if (!question.type) {
+      question.type = 'ESSAY';
+    }
+
+    // Parse options if provided as JSON string
+    if (question.options && typeof question.options === 'string') {
+      try {
+        question.options = JSON.parse(question.options);
+      } catch {
+        // leave as-is if parsing fails
+      }
+    }
+
+    // For non-essay types, keep answer required but without long-text constraints
+    // For essay, enforce min/max length
+    if (question.type === 'ESSAY') {
+      this.form.get('answerText')?.setValidators([
+        Validators.required,
+        Validators.minLength(3),
+        Validators.maxLength(500),
+      ]);
+    } else {
+      this.form.get('answerText')?.setValidators([
+        Validators.required,
+      ]);
+    }
+    this.form.get('answerText')?.updateValueAndValidity();
+
+    return question;
   }
 
   // convenience getter for easy access to form fields
@@ -85,6 +120,7 @@ export class AnswerComponent implements OnInit {
 
     this.submitting = true;
     this.feedback = null;
+    this.errorMessage = null;
 
     this.http
       .post<any>(
@@ -106,6 +142,12 @@ export class AnswerComponent implements OnInit {
         error: (err) => {
           console.error("Error submitting answer:", err);
           this.submitting = false;
+          // Show friendly message if already answered
+          const msg =
+            err?.error?.message ||
+            err?.message ||
+            "Failed to submit answer. Please try again.";
+          this.errorMessage = msg;
         },
       });
   }

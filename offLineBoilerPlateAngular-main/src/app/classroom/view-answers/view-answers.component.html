@@ -87,7 +87,12 @@
                 </div>
                 <div>
                   <h6 class="mb-1">
-                    Student {{ answer.studentId || "Anonymous" }}
+                    <ng-container *ngIf="answer.student; else anon">
+                      {{ answer.student.firstName }} {{ answer.student.lastName }}
+                    </ng-container>
+                    <ng-template #anon>
+                      Student {{ answer.studentId || "Anonymous" }}
+                    </ng-template>
                   </h6>
                   <small class="text-secondary">
                     <i class="bi bi-clock me-1"></i>

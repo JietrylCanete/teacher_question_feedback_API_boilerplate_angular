@@ -29,7 +29,7 @@ async function checkMyAnswer(questionId, studentId) {
     };
 }
 
-async function createQuestion(questionText, teacherId, subjectId, dueDate, points) {
+async function createQuestion(questionText, teacherId, subjectId, dueDate, points, type, options) {
     // Validate required fields
     if (!questionText) {
         throw new Error('Question text is required');
@@ -63,6 +63,14 @@ async function createQuestion(questionText, teacherId, subjectId, dueDate, point
         questionData.points = points;
     }
 
+    // Question type (default to ESSAY if not provided)
+    questionData.type = type || 'ESSAY';
+
+    // Serialize options for MCQ or other types that need them
+    if (options && Array.isArray(options) && options.length > 0) {
+        questionData.options = JSON.stringify(options);
+    }
+
     // Call AI to check relevance
     let aiResult = {
         isRelevant: false,
@@ -83,7 +91,18 @@ async function createQuestion(questionText, teacherId, subjectId, dueDate, point
     console.log('Creating question with data:', questionData);
     
     const question = await db.Question.create(questionData);
-    return question;
+
+    // Normalize options in returned object
+    const plain = question.toJSON();
+    if (plain.options) {
+        try {
+            plain.options = JSON.parse(plain.options);
+        } catch {
+            // leave as-is if parsing fails
+        }
+    }
+
+    return plain;
 }
 
 async function getQuestions(userId, userRole) {
@@ -105,7 +124,7 @@ async function getQuestions(userId, userRole) {
         
         const answeredIds = answeredQuestions.map(a => a.questionId);
         
-        // Add hasAnswered flag and teacher name to each question
+        // Add hasAnswered flag, teacher name and parsed options to each question
         return questions.map(q => {
             const question = q.toJSON();
             question.hasAnswered = answeredIds.includes(q.questionId);
@@ -118,6 +137,15 @@ async function getQuestions(userId, userRole) {
                 question.teacherName = 'Unknown Teacher';
             }
             
+            // Parse options if present
+            if (question.options) {
+                try {
+                    question.options = JSON.parse(question.options);
+                } catch {
+                    // keep raw value if parsing fails
+                }
+            }
+
             // Remove the teacher object to keep response clean
             delete question.teacher;
             
@@ -136,6 +164,15 @@ async function getQuestions(userId, userRole) {
             question.teacherName = 'Unknown Teacher';
         }
         
+        // Parse options if present
+        if (question.options) {
+            try {
+                question.options = JSON.parse(question.options);
+            } catch {
+                // keep raw value if parsing fails
+            }
+        }
+
         // Remove the teacher object to keep response clean
         delete question.teacher;
         
@@ -162,6 +199,15 @@ async function getQuestionById(questionId) {
             questionData.teacherName = 'Unknown Teacher';
         }
         
+        // Parse options if present
+        if (questionData.options) {
+            try {
+                questionData.options = JSON.parse(questionData.options);
+            } catch {
+                // keep raw value if parsing fails
+            }
+        }
+
         // Remove the teacher object to keep response clean
         delete questionData.teacher;
         
@@ -241,11 +287,16 @@ async function getAnswersByQuestionId(questionId, requestingUserId, requestingUs
         whereClause.studentId = requestingUserId;
     }
 
-    // Get all answers for this question with their AI reviews
+    // Get all answers for this question with their AI reviews and student info
     const answers = await db.Answer.findAll({
         where: whereClause,
         include: [{
             model: db.AIReview,
+            required: false
+        }, {
+            model: db.Account,
+            as: 'student',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email'],
             required: false
         }],
         order: [['submittedAt', 'DESC']]
@@ -264,6 +315,16 @@ async function getAnswersByQuestionId(questionId, requestingUserId, requestingUs
         if (answerData.AIReview) {
             answerData.aiReview = answerData.AIReview;
             delete answerData.AIReview;
+        }
+
+        // Normalize student info
+        if (answerData.student) {
+            answerData.student = {
+                AccountId: answerData.student.AccountId,
+                firstName: answerData.student.firstName,
+                lastName: answerData.student.lastName,
+                email: answerData.student.email
+            };
         }
         
         return answerData;

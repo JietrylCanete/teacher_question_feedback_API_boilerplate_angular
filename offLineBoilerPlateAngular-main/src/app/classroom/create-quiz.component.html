@@ -1,0 +1,164 @@
+<div class="create-container">
+  <div class="d-flex align-items-center mb-4">
+    <button class="back-link" (click)="cancel()">
+      <i class="bi bi-arrow-left me-2"></i>
+      Back
+    </button>
+    <h1 class="display-6 fw-bold text-primary ms-3 mb-0">
+      <i class="bi bi-ui-checks-grid me-2"></i>Create Quiz
+    </h1>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+      <div class="create-card">
+        <form [formGroup]="form" (ngSubmit)="onSubmit()">
+          <!-- Subject -->
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-book text-primary me-2"></i>
+              Subject <span class="text-danger">*</span>
+            </label>
+            <select class="form-select" formControlName="subjectId"
+                    [ngClass]="{ 'is-invalid': submitted && f.subjectId.errors }">
+              <option value="">-- Select a subject --</option>
+              <option *ngFor="let subject of subjects" [value]="subject.subjectId">
+                {{ subject.subjectName }} ({{ subject.subjectCode }})
+              </option>
+            </select>
+            <div *ngIf="submitted && f.subjectId.errors" class="invalid-feedback">
+              Please select a subject
+            </div>
+          </div>
+
+          <!-- Quiz Title -->
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="bi bi-type-h2 text-primary me-2"></i>
+              Quiz Title <span class="text-danger">*</span>
+            </label>
+            <input class="form-control"
+                   type="text"
+                   formControlName="title"
+                   placeholder="e.g., Chapter 1 MCQ Quiz"
+                   [ngClass]="{ 'is-invalid': submitted && f.title.errors }" />
+            <div *ngIf="submitted && f.title.errors" class="invalid-feedback">
+              Quiz title is required
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-card-text text-primary me-2"></i>
+              Description
+            </label>
+            <textarea class="form-control"
+                      rows="3"
+                      formControlName="description"
+                      placeholder="Short description of this quiz (optional)"></textarea>
+          </div>
+
+          <!-- Questions -->
+          <div formArrayName="questions">
+            <div *ngFor="let q of questionsArray.controls; let qi = index"
+                 [formGroupName]="qi"
+                 class="mb-4 question-block">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">
+                  <i class="bi bi-question-circle text-primary me-2"></i>
+                  Question {{ qi + 1 }}
+                </h5>
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        (click)="removeQuestion(qi)"
+                        [disabled]="questionsArray.length === 1">
+                  <i class="bi bi-trash me-1"></i>Remove
+                </button>
+              </div>
+
+              <!-- Question text -->
+              <textarea class="form-control mb-2"
+                        formControlName="questionText"
+                        rows="3"
+                        placeholder="Enter the question text..."
+                        ></textarea>
+
+              <!-- Options -->
+              <div class="mt-2">
+                <label class="form-label small text-secondary">
+                  <i class="bi bi-list-ul me-1"></i>
+                  Options (at least 2)
+                </label>
+                <div class="row g-2" formArrayName="options">
+                  <div class="col-md-6"
+                       *ngFor="let opt of getOptionsArray(qi).controls; let oi = index">
+                    <div class="input-group">
+                      <span class="input-group-text">{{ 'ABCD'[oi] || '?' }}</span>
+                      <input class="form-control"
+                             type="text"
+                             [formControlName]="oi"
+                             placeholder="Option {{ oi + 1 }}" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Correct answer + points -->
+              <div class="row mt-3">
+                <div class="col-md-8">
+                  <label class="form-label small text-secondary">
+                    <i class="bi bi-check-circle me-1"></i>
+                    Correct Answer (must match one of the options exactly)
+                  </label>
+                  <input class="form-control"
+                         type="text"
+                         formControlName="correctAnswer"
+                         placeholder="Type the correct option value here" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small text-secondary">
+                    <i class="bi bi-star me-1"></i>
+                    Points
+                  </label>
+                  <input class="form-control"
+                         type="number"
+                         formControlName="points"
+                         min="1" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add question button -->
+          <div class="mb-4">
+            <button type="button"
+                    class="btn btn-outline-primary"
+                    (click)="addQuestion()">
+              <i class="bi bi-plus-circle me-2"></i>
+              Add Another Question
+            </button>
+          </div>
+
+          <!-- Actions -->
+          <div class="d-flex gap-3">
+            <button type="submit"
+                    class="btn btn-primary flex-grow-1"
+                    [disabled]="submitting || loadingSubjects">
+              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2"></span>
+              <i *ngIf="!submitting" class="bi bi-send me-2"></i>
+              {{ submitting ? 'Creating Quiz...' : 'Create Quiz' }}
+            </button>
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    (click)="cancel()">
+              <i class="bi bi-x-circle me-1"></i>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+

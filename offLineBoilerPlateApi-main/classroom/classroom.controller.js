@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authorize = require('_middleware/authorize');
 const classroomService = require('./classroom.service');
+const quizService = require('./quiz.service');
 
 // Existing routes
 router.post('/questions', authorize(), createQuestion);
@@ -14,6 +15,11 @@ router.get('/questions/:id/answers', authorize(['Teacher', 'Admin']), getAnswers
 // NEW: Get a single question by ID
 router.get('/questions/:id', authorize(), getQuestionById);
 router.get('/questions/:id/my-answer', authorize(), checkMyAnswer);
+
+// Quiz routes
+router.post('/quizzes', authorize(['Teacher', 'Admin']), createQuiz);
+router.get('/quizzes/:id', authorize(), getQuiz);
+router.post('/quizzes/:id/answers', authorize(['Student', 'User']), submitQuizAnswers);
 
 function checkMyAnswer(req, res, next) {
     classroomService.checkMyAnswer(req.params.id, req.user.AccountId)
@@ -67,6 +73,24 @@ function getAnswers(req, res, next) {
         req.user.role
     )
         .then(answers => res.json(answers))
+        .catch(next);
+}
+
+function createQuiz(req, res, next) {
+    quizService.createQuiz(req.user.AccountId, req.body)
+        .then(quiz => res.json(quiz))
+        .catch(next);
+}
+
+function getQuiz(req, res, next) {
+    quizService.getQuizById(req.params.id)
+        .then(quiz => res.json(quiz))
+        .catch(next);
+}
+
+function submitQuizAnswers(req, res, next) {
+    quizService.submitQuizAnswers(req.params.id, req.user.AccountId, req.body)
+        .then(result => res.json(result))
         .catch(next);
 }
 

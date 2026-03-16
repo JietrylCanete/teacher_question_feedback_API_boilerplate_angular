@@ -11,6 +11,8 @@ import { ListComponent } from './list/list.component';
 import { AnswerComponent } from './answer/answer.component';
 import { CreateQuestionComponent } from './create-question.component';
 import { ViewAnswersComponent } from './view-answers/view-answers.component';
+import { CreateQuizComponent } from './create-quiz.component';
+import { TakeQuizComponent } from './take-quiz.component';
 
 @NgModule({
   declarations: [
@@ -19,7 +21,9 @@ import { ViewAnswersComponent } from './view-answers/view-answers.component';
     ListComponent,
     AnswerComponent,
     CreateQuestionComponent,
-    ViewAnswersComponent
+    ViewAnswersComponent,
+    CreateQuizComponent,
+    TakeQuizComponent
   ],
   imports: [
     CommonModule,

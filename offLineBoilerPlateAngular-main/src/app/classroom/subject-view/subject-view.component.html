@@ -116,9 +116,18 @@
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="h4 mb-0">Subject Questions</h3>
         <ng-container *ngIf="isTeacher()">
-          <a [routerLink]="['/classroom/create']" [queryParams]="{subjectId: subject?.subjectId}" class="btn btn-primary">
-            <i class="bi bi-plus-circle me-2"></i>Create Question
-          </a>
+          <div class="btn-group">
+            <a [routerLink]="['/classroom/create']"
+               [queryParams]="{subjectId: subject?.subjectId}"
+               class="btn btn-primary">
+              <i class="bi bi-plus-circle me-2"></i>Create Question
+            </a>
+            <a [routerLink]="['/classroom/quiz/create']"
+               [queryParams]="{subjectId: subject?.subjectId}"
+               class="btn btn-outline-primary">
+              <i class="bi bi-ui-checks-grid me-2"></i>Create Quiz
+            </a>
+          </div>
         </ng-container>
       </div>
 

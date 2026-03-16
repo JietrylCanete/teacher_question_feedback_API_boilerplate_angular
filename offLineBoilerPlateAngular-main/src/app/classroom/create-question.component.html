@@ -52,24 +52,6 @@
             </div>
           </div>
 
-          <!-- Question Type -->
-          <div class="mb-4">
-            <label class="form-label">
-              <i class="bi bi-sliders text-primary me-2"></i>
-              Question Type <span class="text-danger">*</span>
-            </label>
-            <select
-              class="form-select"
-              formControlName="type"
-              [ngClass]="{ 'is-invalid': submitted && f.type.errors }">
-              <option value="ESSAY">Essay / Open ended</option>
-              <option value="MCQ">Multiple Choice</option>
-            </select>
-            <div *ngIf="submitted && f.type.errors" class="invalid-feedback">
-              Please select a question type
-            </div>
-          </div>
-
           <!-- Question Input -->
           <div class="mb-4">
             <label class="form-label">
@@ -109,28 +91,6 @@
               <div *ngIf="f.questionText.errors.maxlength">
                 <i class="bi bi-exclamation-circle me-1"></i>
                 Question cannot exceed 500 characters
-              </div>
-            </div>
-          </div>
-
-          <!-- Multiple Choice Options (shown only for MCQ) -->
-          <div class="mb-4" *ngIf="form.get('type')?.value === 'MCQ'">
-            <label class="form-label">
-              <i class="bi bi-list-ul text-primary me-2"></i>
-              Options
-            </label>
-            <div class="mb-2 text-secondary small">
-              Add at least two options. Students will pick one option as their answer.
-            </div>
-            <div class="row g-2" formArrayName="options">
-              <div
-                class="col-md-6"
-                *ngFor="let ctrl of mcqOptionsArray.controls; let i = index">
-                <input
-                  type="text"
-                  class="form-control"
-                  [formControlName]="i"
-                  placeholder="Option {{ i + 1 }}" />
               </div>
             </div>
           </div>

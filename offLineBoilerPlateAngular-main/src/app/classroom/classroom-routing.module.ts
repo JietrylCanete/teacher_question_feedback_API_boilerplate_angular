@@ -8,6 +8,8 @@ import { ListComponent } from './list/list.component';
 import { AnswerComponent } from './answer/answer.component';
 import { CreateQuestionComponent } from './create-question.component';
 import { ViewAnswersComponent } from './view-answers/view-answers.component';
+import { CreateQuizComponent } from './create-quiz.component';
+import { TakeQuizComponent } from './take-quiz.component';
 
 const routes: Routes = [
   { 
@@ -35,6 +37,18 @@ const routes: Routes = [
     component: CreateQuestionComponent,
     canActivate: [AuthGuard],
     data: { roles: ['Teacher', 'Admin'] }
+  },
+  {
+    path: 'quiz/create',
+    component: CreateQuizComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['Teacher', 'Admin'] }
+  },
+  {
+    path: 'quiz/:id/take',
+    component: TakeQuizComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['User', 'Student'] }
   },
   { 
     path: 'view/:id', 

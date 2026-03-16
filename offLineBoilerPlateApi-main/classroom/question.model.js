@@ -5,6 +5,14 @@ module.exports = model;
 function model(sequelize) {
     const attributes = {
         questionId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        quizId: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'Quizzes',
+                key: 'quizId'
+            }
+        },
         subjectId: { 
             type: DataTypes.INTEGER, 
             allowNull: false,
@@ -22,6 +30,11 @@ function model(sequelize) {
         },
         // Optional serialized options for types like MCQ
         options: {
+            type: DataTypes.TEXT,
+            allowNull: true
+        },
+        // For auto-graded questions like MCQ
+        correctAnswer: {
             type: DataTypes.TEXT,
             allowNull: true
         },

@@ -278,27 +278,17 @@ loadSubjects() {
   }
 
 enrollSubject(subject: any) {
-  if (confirm(`Are you sure you want to enroll in ${subject.subjectName}?`)) {
-    console.log('Enrolling in subject:', subject); // Add this log
-    
+  if (confirm(`Are you sure you want to request enrollment in ${subject.subjectName}?`)) {
     this.subjectService.enroll(subject.subjectId)
       .pipe(first())
       .subscribe({
         next: (response) => {
-          console.log('Enroll response:', response); // Add this log
-          this.alertService.success(`Successfully enrolled in ${subject.subjectName}`);
-          
-          // Force reload from server
-          this.loadSubjects();
-          
-          // Switch to enrolled view
-          if (this.isStudent()) {
-            this.viewMode = 'enrolled';
-          }
+          this.alertService.success('Enrollment request sent! Awaiting teacher approval.');
+          this.loadSubjects(); // Reload to show pending status
         },
         error: (error: any) => {
           console.error('Error enrolling:', error);
-          this.alertService.error(error.message || 'Failed to enroll');
+          this.alertService.error(error.message || 'Failed to request enrollment');
         }
       });
   }

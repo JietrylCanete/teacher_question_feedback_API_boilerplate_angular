@@ -89,6 +89,10 @@
               <span *ngIf="subject.isEnrolled" class="badge bg-success px-3 py-2 rounded-pill">
                 <i class="bi bi-check-circle-fill me-1"></i>Enrolled
               </span>
+              <!-- Pending Badge -->
+              <span *ngIf="subject.isPending" class="badge bg-warning px-3 py-2 rounded-pill">
+                <i class="bi bi-hourglass-split me-1"></i>Pending
+              </span>
               <small class="text-secondary">
                 <i class="bi bi-calendar me-1"></i>{{ subject.createdAt | date:'shortDate' }}
               </small>
@@ -145,19 +149,29 @@
               </button>
             </ng-container>
 
-            <!-- For Students -->
-            <ng-container *ngIf="isStudent()">
-              <ng-container *ngIf="subject.isEnrolled">
-                <button class="btn btn-success" (click)="viewSubject(subject)">
-                  <i class="bi bi-box-arrow-in-right me-2"></i>Enter Classroom
-                </button>
-              </ng-container>
-              <ng-container *ngIf="!subject.isEnrolled && viewMode === 'available'">
-                <button class="btn btn-outline-primary" (click)="enrollSubject(subject)">
-                  <i class="bi bi-plus-circle me-2"></i>Enroll
-                </button>
-              </ng-container>
-            </ng-container>
+<!-- For Students -->
+<ng-container *ngIf="isStudent()">
+  <!-- Already enrolled -->
+  <ng-container *ngIf="subject.isEnrolled">
+    <button class="btn btn-success" (click)="viewSubject(subject)">
+      <i class="bi bi-box-arrow-in-right me-2"></i>Enter Classroom
+    </button>
+  </ng-container>
+
+  <!-- Available to enroll -->
+  <ng-container *ngIf="!subject.isEnrolled && !subject.isPending && viewMode === 'available'">
+    <button class="btn btn-outline-primary" (click)="enrollSubject(subject)">
+      <i class="bi bi-plus-circle me-2"></i>Enroll
+    </button>
+  </ng-container>
+
+  <!-- Pending approval -->
+  <ng-container *ngIf="subject.isPending">
+    <button class="btn btn-warning" disabled>
+      <i class="bi bi-hourglass-split me-2"></i>Pending Approval
+    </button>
+  </ng-container>
+</ng-container>
           </div>
         </div>
       </div>

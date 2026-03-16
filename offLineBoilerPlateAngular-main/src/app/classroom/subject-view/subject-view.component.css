@@ -130,4 +130,19 @@
   .nav-tabs .nav-link {
     padding: 0.75rem 1rem;
   }
+  /* Relevance badges */
+.badge.bg-success {
+  background-color: #198754 !important;
+  color: white;
+}
+
+.badge.bg-danger {
+  background-color: #dc3545 !important;
+  color: white;
+}
+
+/* Tooltip styling */
+[title] {
+  cursor: help;
+}
 }

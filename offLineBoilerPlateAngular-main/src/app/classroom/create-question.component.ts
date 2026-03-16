@@ -98,19 +98,13 @@ export class CreateQuestionComponent implements OnInit {
 onSubmit() {
   this.submitted = true;
 
-  // stop here if form is invalid
   if (this.form.invalid) {
     console.log('Form invalid:', this.form.errors);
     console.log('Form values:', this.form.value);
     return;
   }
 
-  // Double-check subjectId is present
   const formValue = this.form.value;
-  console.log('Raw form value:', formValue);
-  console.log('SubjectId value:', formValue.subjectId);
-  console.log('SubjectId type:', typeof formValue.subjectId);
-
   if (!formValue.subjectId) {
     console.error('SubjectId is missing from form');
     this.alertService.error('Please select a subject');
@@ -119,40 +113,43 @@ onSubmit() {
 
   this.submitting = true;
   
-  // Make sure subjectId is a number
   const requestData = {
     questionText: formValue.questionText,
-    subjectId: Number(formValue.subjectId), // Force convert to number
+    subjectId: Number(formValue.subjectId),
     dueDate: formValue.dueDate || null,
     points: formValue.points || 100
   };
   
-  console.log('Final request data being sent:', requestData);
+  console.log('Sending request:', requestData);
   
   this.http.post<any>(`${environment.apiUrl}/classroom/questions`, requestData)
     .pipe(first())
     .subscribe({
       next: (response) => {
-        console.log('Question created successfully:', response);
-        this.alertService.success('Question created successfully', { keepAfterRouteChange: true });
+        console.log('Question created:', response);
+        
+        // Show AI relevance feedback
+        if (response.aiRelevance !== undefined) {
+          const icon = response.aiRelevance ? '✅' : '⚠️';
+          const status = response.aiRelevance ? 'Relevant' : 'Not Relevant';
+          this.alertService.success(
+            `Question created. ${icon} AI assessment: ${status}. ${response.aiFeedback || ''}`,
+            { keepAfterRouteChange: true }
+          );
+        } else {
+          this.alertService.success('Question created successfully', { keepAfterRouteChange: true });
+        }
         
         // Navigate back to subject
-        const selectedSubjectId = requestData.subjectId;
-        if (selectedSubjectId) {
-          this.router.navigate(['/classroom/subject', selectedSubjectId]);
+        if (requestData.subjectId) {
+          this.router.navigate(['/classroom/subject', requestData.subjectId]);
         } else {
           this.router.navigate(['/classroom/subjects']);
         }
       },
-      error: (error: any) => {
+      error: (error) => {
         console.error('Error creating question:', error);
-        
-        // Log the full error response
-        if (error.error) {
-          console.error('Error details from server:', error.error);
-        }
-        
-        this.alertService.error(error.message || error || 'Failed to create question');
+        this.alertService.error(error.message || 'Failed to create question');
         this.submitting = false;
       }
     });

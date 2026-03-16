@@ -20,12 +20,17 @@ router.get('/:subjectId/students', authorize(['Teacher', 'Admin']), getSubjectSt
 // Subject questions
 router.get('/:subjectId/questions', authorize(), getSubjectQuestions);
 
+// Teacher approval routes
+router.get('/:subjectId/pending-students', authorize(['Teacher', 'Admin']), getPendingStudents);
+router.put('/:subjectId/approve/:studentId', authorize(['Teacher', 'Admin']), approveStudent);
+router.put('/:subjectId/reject/:studentId', authorize(['Teacher', 'Admin']), rejectStudent);
+
 module.exports = router;
 
 // Controller functions
 function getSubjects(req, res, next) {
-    console.log('GET /subjects called');
-    console.log('User data:', req.user);
+    //console.log('GET /subjects called');
+    //console.log('User data:', req.user);
     
     subjectService.getAll(req.user.AccountId, req.user.role)
         .then(subjects => {
@@ -33,7 +38,7 @@ function getSubjects(req, res, next) {
             res.json(subjects);
         })
         .catch(error => {
-            console.error('Error in getSubjects:', error);
+            //console.error('Error in getSubjects:', error);
             res.status(500).json({ 
                 message: error.message || 'Failed to fetch subjects',
                 error: error.toString()
@@ -42,7 +47,7 @@ function getSubjects(req, res, next) {
 }
 
 function getMySubjects(req, res, next) {
-    console.log('GET /my-subjects called');
+    //console.log('GET /my-subjects called');
     subjectService.getMySubjects(req.user.AccountId, req.user.role)
         .then(subjects => res.json(subjects))
         .catch(next);
@@ -103,5 +108,23 @@ function getSubjectStudents(req, res, next) {
 function getSubjectQuestions(req, res, next) {
     subjectService.getSubjectQuestions(req.params.subjectId, req.user.AccountId, req.user.role)
         .then(questions => res.json(questions))
+        .catch(next);
+}
+
+function getPendingStudents(req, res, next) {
+    subjectService.getPendingStudents(req.params.subjectId)
+        .then(students => res.json(students))
+        .catch(next);
+}
+
+function approveStudent(req, res, next) {
+    subjectService.approveStudent(req.params.subjectId, req.params.studentId)
+        .then(() => res.json({ message: 'Student approved successfully' }))
+        .catch(next);
+}
+
+function rejectStudent(req, res, next) {
+    subjectService.rejectStudent(req.params.subjectId, req.params.studentId)
+        .then(() => res.json({ message: 'Student rejected successfully' }))
         .catch(next);
 }

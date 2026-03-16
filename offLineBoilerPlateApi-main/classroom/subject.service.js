@@ -36,7 +36,7 @@ async function getAll(userId, userRole) {
         //console.log(`Found ${subjects.length} total subjects in database`);
         
         if (subjects.length === 0) {
-            console.log('No subjects found in database');
+            //console.log('No subjects found in database');
             return [];
         }
 
@@ -44,7 +44,8 @@ async function getAll(userId, userRole) {
 if (userRole === 'Student' || userRole === 'User') {
     //console.log('User is student, checking enrollments for userId:', userId);
     
-    const enrollments = await db.SubjectEnrollment.findAll({
+    // Get active (approved) enrollments
+    const activeEnrollments = await db.SubjectEnrollment.findAll({
         where: { 
             studentId: userId,
             status: 'active'
@@ -52,27 +53,25 @@ if (userRole === 'Student' || userRole === 'User') {
         attributes: ['subjectId']
     });
     
-    const enrolledSubjectIds = enrollments.map(e => e.subjectId);
-    //console.log('Student is enrolled in subject IDs:', enrolledSubjectIds);
+    // Get pending enrollments
+    const pendingEnrollments = await db.SubjectEnrollment.findAll({
+        where: { 
+            studentId: userId,
+            status: 'pending'
+        },
+        attributes: ['subjectId']
+    });
     
-    const result = await Promise.all(subjects.map(async (subject) => {
+    const activeSubjectIds = activeEnrollments.map(e => e.subjectId);
+    const pendingSubjectIds = pendingEnrollments.map(e => e.subjectId);
+    
+    //console.log('Active subjects:', activeSubjectIds);
+    //console.log('Pending subjects:', pendingSubjectIds);
+    
+    const result = subjects.map(subject => {
         const subjectData = subject.toJSON();
-        subjectData.isEnrolled = enrolledSubjectIds.includes(subject.subjectId);
-        
-        // Add student count
-        const studentCount = await db.SubjectEnrollment.count({
-            where: { 
-                subjectId: subject.subjectId,
-                status: 'active'
-            }
-        });
-        subjectData.studentCount = studentCount;
-        
-        // Add question count
-        const questionCount = await db.Question.count({
-            where: { subjectId: subject.subjectId }
-        });
-        subjectData.questionCount = questionCount;
+        subjectData.isEnrolled = activeSubjectIds.includes(subject.subjectId);
+        subjectData.isPending = pendingSubjectIds.includes(subject.subjectId);
         
         if (subjectData.teacher) {
             subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
@@ -80,9 +79,9 @@ if (userRole === 'Student' || userRole === 'User') {
         }
         
         return subjectData;
-    }));
+    });
     
-    console.log('Returning subjects with enrollment status');
+    //console.log('Returning subjects with enrollment status');
     return result;
 }
 
@@ -97,7 +96,7 @@ if (userRole === 'Student' || userRole === 'User') {
             return subjectData;
         });
     } catch (error) {
-        console.error('ERROR in getAll service:', error);
+        //console.error('ERROR in getAll service:', error);
         throw new Error(`Failed to fetch subjects: ${error.message}`);
     }
 }
@@ -191,17 +190,24 @@ async function getSubjectById(subjectId, userId, userRole) {
     const subjectData = formatSubject(subject);
 
     // Check if user is enrolled (for students)
-    if (userRole === 'Student' || userRole === 'User') {
-        const enrollment = await db.SubjectEnrollment.findOne({
-            where: {
-                subjectId: subjectId,
-                studentId: userId,
-                status: 'active'
-            }
-        });
-        subjectData.isEnrolled = !!enrollment;
-    }
-
+if (userRole === 'Student' || userRole === 'User') {
+    const activeEnrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId: subjectId,
+            studentId: userId,
+            status: 'active'
+        }
+    });
+    const pendingEnrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId: subjectId,
+            studentId: userId,
+            status: 'pending'
+        }
+    });
+    subjectData.isEnrolled = !!activeEnrollment;
+    subjectData.isPending = !!pendingEnrollment;
+}
     // Get stats
     subjectData.studentCount = await db.SubjectEnrollment.count({
         where: { 
@@ -267,42 +273,39 @@ async function enrollStudent(subjectId, studentId) {
         throw new Error('Subject not found');
     }
 
-    // Check if already enrolled
+    // Check if already enrolled or pending
     const existingEnrollment = await db.SubjectEnrollment.findOne({
-        where: {
-            subjectId,
-            studentId,
-            status: 'active'
-        }
-    });
-
-    if (existingEnrollment) {
-        throw new Error('Student is already enrolled in this subject');
-    }
-
-    // Check if previously dropped/enrolled
-    const previousEnrollment = await db.SubjectEnrollment.findOne({
         where: {
             subjectId,
             studentId
         }
     });
 
-    if (previousEnrollment) {
-        // Reactivate if previously enrolled
-        previousEnrollment.status = 'active';
-        await previousEnrollment.save();
-    } else {
-        // Create new enrollment
-        await db.SubjectEnrollment.create({
-            subjectId,
-            studentId,
-            enrolledAt: new Date(),
-            status: 'active'
-        });
+    if (existingEnrollment) {
+        if (existingEnrollment.status === 'active') {
+            throw new Error('You are already enrolled in this subject');
+        }
+        if (existingEnrollment.status === 'pending') {
+            throw new Error('Your enrollment request is already pending approval');
+        }
+        if (existingEnrollment.status === 'dropped') {
+            // Re-enroll by setting to pending
+            existingEnrollment.status = 'pending';
+            existingEnrollment.enrolledAt = new Date();
+            await existingEnrollment.save();
+            return { message: 'Enrollment request submitted for approval' };
+        }
     }
 
-    return { message: 'Successfully enrolled in subject' };
+    // Create new enrollment with pending status
+    await db.SubjectEnrollment.create({
+        subjectId,
+        studentId,
+        enrolledAt: new Date(),
+        status: 'pending'
+    });
+
+    return { message: 'Enrollment request submitted for approval' };
 }
 
 async function removeStudent(subjectId, studentId) {
@@ -420,6 +423,70 @@ function formatSubject(subject) {
     return subjectData;
 }
 
+async function approveStudent(subjectId, studentId) {
+    const enrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId,
+            studentId,
+            status: 'pending'
+        }
+    });
+
+    if (!enrollment) {
+        throw new Error('Pending enrollment not found');
+    }
+
+    enrollment.status = 'active';
+    await enrollment.save();
+
+    return { message: 'Student approved successfully' };
+}
+
+async function rejectStudent(subjectId, studentId) {
+    const enrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId,
+            studentId,
+            status: 'pending'
+        }
+    });
+
+    if (!enrollment) {
+        throw new Error('Pending enrollment not found');
+    }
+
+    enrollment.status = 'dropped'; // or you could use 'rejected' if you add that enum
+    await enrollment.save();
+
+    return { message: 'Student rejected successfully' };
+}
+
+async function getPendingStudents(subjectId) {
+    const enrollments = await db.SubjectEnrollment.findAll({
+        where: {
+            subjectId,
+            status: 'pending'
+        },
+        include: [{
+            model: db.Account,
+            as: 'student',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email']
+        }],
+        order: [['enrolledAt', 'DESC']]
+    });
+
+    return enrollments.map(e => ({
+        enrollmentId: e.enrollmentId,
+        enrolledAt: e.enrolledAt,
+        student: e.student ? {
+            AccountId: e.student.AccountId,
+            firstName: e.student.firstName,
+            lastName: e.student.lastName,
+            email: e.student.email
+        } : null
+    }));
+}
+
 // Export all functions at the END
 module.exports = {
     createSubject,
@@ -431,5 +498,8 @@ module.exports = {
     enrollStudent,
     removeStudent,
     getSubjectStudents,
-    getSubjectQuestions
+    getSubjectQuestions,
+    approveStudent,
+    rejectStudent,
+    getPendingStudents
 };

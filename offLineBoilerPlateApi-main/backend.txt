@@ -1385,7 +1385,7 @@ function getSubjects(req, res, next) {
     
     subjectService.getAll(req.user.AccountId, req.user.role)
         .then(subjects => {
-            console.log(`Successfully fetched ${subjects.length} subjects`);
+            //console.log(`Successfully fetched ${subjects.length} subjects`);
             res.json(subjects);
         })
         .catch(error => {
@@ -1489,25 +1489,13 @@ function model(sequelize) {
 
 ================================================================================
 File: classroom\subject.service.js
-Size: 15.41 kB
+Size: 13.49 kB
 ================================================================================
 
 const db = require('_helpers/db');
 const { Op } = require('sequelize');
 
-module.exports = {
-    createSubject,
-    getSubjects,
-    getMySubjects,
-    getSubjectById,
-    updateSubject,
-    deleteSubject,
-    enrollStudent,
-    removeStudent,
-    getSubjectStudents,
-    getSubjectQuestions
-};
-
+// Define all functions first
 async function createSubject(params) {
     // Check if subject code already exists
     const existingSubject = await db.Subject.findOne({ 
@@ -1524,25 +1512,94 @@ async function createSubject(params) {
     return getSubjectById(subject.subjectId);
 }
 
-async function getSubjects(userRole) {
-    // Admins can see all subjects, teachers/students see different views
-    const subjects = await db.Subject.findAll({
-        include: [{
-            model: db.Account,
-            as: 'teacher',
-            attributes: ['AccountId', 'firstName', 'lastName', 'email']
-        }],
-        order: [['createdAt', 'DESC']]
-    });
+async function getAll(userId, userRole) {
+    try {
+        //console.log('=== getAll subjects service ===');
+        //console.log('Received userId:', userId, 'userRole:', userRole);
+        
+        // First, check if Subjects table has data
+        const subjects = await db.Subject.findAll({
+            include: [{
+                model: db.Account,
+                as: 'teacher',
+                attributes: ['AccountId', 'firstName', 'lastName', 'email']
+            }],
+            order: [['createdAt', 'DESC']]
+        });
 
-    return subjects.map(formatSubject);
+        //console.log(`Found ${subjects.length} total subjects in database`);
+        
+        if (subjects.length === 0) {
+            console.log('No subjects found in database');
+            return [];
+        }
+
+// If user is a student, check enrollment status for each subject
+if (userRole === 'Student' || userRole === 'User') {
+    //console.log('User is student, checking enrollments for userId:', userId);
+    
+    const enrollments = await db.SubjectEnrollment.findAll({
+        where: { 
+            studentId: userId,
+            status: 'active'
+        },
+        attributes: ['subjectId']
+    });
+    
+    const enrolledSubjectIds = enrollments.map(e => e.subjectId);
+    //console.log('Student is enrolled in subject IDs:', enrolledSubjectIds);
+    
+    const result = await Promise.all(subjects.map(async (subject) => {
+        const subjectData = subject.toJSON();
+        subjectData.isEnrolled = enrolledSubjectIds.includes(subject.subjectId);
+        
+        // Add student count
+        const studentCount = await db.SubjectEnrollment.count({
+            where: { 
+                subjectId: subject.subjectId,
+                status: 'active'
+            }
+        });
+        subjectData.studentCount = studentCount;
+        
+        // Add question count
+        const questionCount = await db.Question.count({
+            where: { subjectId: subject.subjectId }
+        });
+        subjectData.questionCount = questionCount;
+        
+        if (subjectData.teacher) {
+            subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+            delete subjectData.teacher;
+        }
+        
+        return subjectData;
+    }));
+    
+    console.log('Returning subjects with enrollment status');
+    return result;
+}
+
+        // For teachers/admins
+        //console.log('User is teacher/admin, returning all subjects without enrollment status');
+        return subjects.map(subject => {
+            const subjectData = subject.toJSON();
+            if (subjectData.teacher) {
+                subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+                delete subjectData.teacher;
+            }
+            return subjectData;
+        });
+    } catch (error) {
+        console.error('ERROR in getAll service:', error);
+        throw new Error(`Failed to fetch subjects: ${error.message}`);
+    }
 }
 
 async function getMySubjects(userId, userRole) {
     let subjects;
     
     if (userRole === 'Teacher' || userRole === 'Admin') {
-        // Teachers see subjects they teach
         subjects = await db.Subject.findAll({
             where: { teacherId: userId },
             include: [{
@@ -1567,29 +1624,40 @@ async function getMySubjects(userId, userRole) {
                         studentId: userId,
                         status: 'active'
                     },
-                    required: true
+                    required: true,
+                    attributes: []
                 }
             ],
             order: [['createdAt', 'DESC']]
         });
+        
+        // Mark all as enrolled since this query only returns enrolled subjects
+        subjects = subjects.map(subject => {
+            const subjectData = subject.toJSON();
+            subjectData.isEnrolled = true;
+            return subjectData;
+        });
     }
 
-    // Add enrollment count for each subject
+    // Add counts
     const subjectsWithStats = await Promise.all(subjects.map(async (subject) => {
-        const subjectData = formatSubject(subject);
+        const subjectData = subject.toJSON ? subject.toJSON() : subject;
         
-        // Get student count
         const studentCount = await db.SubjectEnrollment.count({
             where: { 
-                subjectId: subject.subjectId,
+                subjectId: subjectData.subjectId,
                 status: 'active'
             }
         });
         
-        // Get question count
         const questionCount = await db.Question.count({
-            where: { subjectId: subject.subjectId }
+            where: { subjectId: subjectData.subjectId }
         });
+        
+        if (subjectData.teacher) {
+            subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+            delete subjectData.teacher;
+        }
         
         return {
             ...subjectData,
@@ -1845,147 +1913,20 @@ function formatSubject(subject) {
     
     return subjectData;
 }
-async function getAll(userId, userRole) {
-    try {
-        console.log('=== getAll subjects service ===');
-        console.log('Received userId:', userId, 'userRole:', userRole);
-        
-        // First, check if Subjects table has data
-        const subjects = await db.Subject.findAll({
-            include: [{
-                model: db.Account,
-                as: 'teacher',
-                attributes: ['AccountId', 'firstName', 'lastName', 'email']
-            }],
-            order: [['createdAt', 'DESC']]
-        });
 
-        console.log(`Found ${subjects.length} total subjects in database`);
-        
-        if (subjects.length === 0) {
-            console.log('No subjects found in database');
-            return [];
-        }
-
-        // If user is a student, check enrollment status for each subject
-        if (userRole === 'Student' || userRole === 'User') {
-            console.log('User is student, checking enrollments for userId:', userId);
-            
-            const enrollments = await db.SubjectEnrollment.findAll({
-                where: { 
-                    studentId: userId,
-                    status: 'active'
-                },
-                attributes: ['subjectId']
-            });
-            
-            const enrolledSubjectIds = enrollments.map(e => e.subjectId);
-            console.log('Student is enrolled in subject IDs:', enrolledSubjectIds);
-            
-            const result = subjects.map(subject => {
-                const subjectData = subject.toJSON();
-                subjectData.isEnrolled = enrolledSubjectIds.includes(subject.subjectId);
-                
-                if (subjectData.teacher) {
-                    subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
-                    delete subjectData.teacher;
-                }
-                
-                return subjectData;
-            });
-            
-            console.log('Returning subjects with enrollment status');
-            return result;
-        }
-
-        // For teachers/admins
-        console.log('User is teacher/admin, returning all subjects without enrollment status');
-        return subjects.map(subject => {
-            const subjectData = subject.toJSON();
-            if (subjectData.teacher) {
-                subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
-                delete subjectData.teacher;
-            }
-            return subjectData;
-        });
-    } catch (error) {
-        console.error('ERROR in getAll service:', error);
-        throw new Error(`Failed to fetch subjects: ${error.message}`);
-    }
-}
-
-async function getMySubjects(userId, userRole) {
-    let subjects;
-    
-    if (userRole === 'Teacher' || userRole === 'Admin') {
-        subjects = await db.Subject.findAll({
-            where: { teacherId: userId },
-            include: [{
-                model: db.Account,
-                as: 'teacher',
-                attributes: ['AccountId', 'firstName', 'lastName', 'email']
-            }],
-            order: [['createdAt', 'DESC']]
-        });
-    } else {
-        // Students see subjects they're enrolled in
-        subjects = await db.Subject.findAll({
-            include: [
-                {
-                    model: db.Account,
-                    as: 'teacher',
-                    attributes: ['AccountId', 'firstName', 'lastName', 'email']
-                },
-                {
-                    model: db.SubjectEnrollment,
-                    where: { 
-                        studentId: userId,
-                        status: 'active'
-                    },
-                    required: true,
-                    attributes: []
-                }
-            ],
-            order: [['createdAt', 'DESC']]
-        });
-        
-        // Mark all as enrolled since this query only returns enrolled subjects
-        subjects = subjects.map(subject => {
-            const subjectData = subject.toJSON();
-            subjectData.isEnrolled = true;
-            return subjectData;
-        });
-    }
-
-    // Add counts
-    const subjectsWithStats = await Promise.all(subjects.map(async (subject) => {
-        const subjectData = subject.toJSON ? subject.toJSON() : subject;
-        
-        const studentCount = await db.SubjectEnrollment.count({
-            where: { 
-                subjectId: subjectData.subjectId,
-                status: 'active'
-            }
-        });
-        
-        const questionCount = await db.Question.count({
-            where: { subjectId: subjectData.subjectId }
-        });
-        
-        if (subjectData.teacher) {
-            subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
-            delete subjectData.teacher;
-        }
-        
-        return {
-            ...subjectData,
-            studentCount,
-            questionCount
-        };
-    }));
-
-    return subjectsWithStats;
-}
+// Export all functions at the END
+module.exports = {
+    createSubject,
+    getAll,           // This is for the main /subjects route
+    getMySubjects,    // This is for the /my-subjects route
+    getSubjectById,
+    updateSubject,
+    deleteSubject,
+    enrollStudent,
+    removeStudent,
+    getSubjectStudents,
+    getSubjectQuestions
+};
 
 ================================================================================
 File: config.json
@@ -3076,7 +3017,7 @@ function authorize(roles = []) {
                 req.user.ownsToken = token => !!refreshTokens.find(x => x.token === token);
 
                 // Log authorization attempt
-                console.log(`Authorization successful for user ${account.email} with role ${account.role}`);
+                //console.log(`Authorization successful for user ${account.email} with role ${account.role}`);
 
                 next();
             } catch (error) {

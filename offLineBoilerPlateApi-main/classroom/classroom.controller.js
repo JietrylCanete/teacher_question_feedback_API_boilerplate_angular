@@ -21,8 +21,8 @@ function checkMyAnswer(req, res, next) {
         .catch(next);
 }
 function createQuestion(req, res, next) {
-    console.log('Create question request body:', req.body); // Debug log
-    console.log('User ID:', req.user.AccountId); // Debug log
+    //console.log('Create question request body:', req.body); // Debug log
+    //console.log('User ID:', req.user.AccountId); // Debug log
     
     classroomService.createQuestion(
         req.body.questionText, 

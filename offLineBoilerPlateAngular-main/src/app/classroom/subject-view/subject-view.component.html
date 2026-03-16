@@ -65,7 +65,51 @@
           <i class="bi bi-people me-2"></i>Students
         </a>
       </li>
+      <li *ngIf="isTeacher()" class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'pending'" (click)="setActiveTab('pending')">
+          <i class="bi bi-hourglass-split me-2"></i>
+          Pending Approvals
+          <span class="badge bg-warning ms-2">{{ pendingStudents.length }}</span>
+        </a>
+      </li>
     </ul>
+
+    <!-- Pending Approvals Tab Content -->
+    <div *ngIf="activeTab === 'pending' && isTeacher()" class="mt-4">
+      <h4>Pending Enrollment Requests</h4>
+      
+      <!-- Loading spinner -->
+      <div *ngIf="loadingPending" class="text-center py-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+      
+      <!-- No pending requests -->
+      <div *ngIf="!loadingPending && pendingStudents.length === 0" class="text-center py-4">
+        <p class="text-secondary">No pending enrollment requests.</p>
+      </div>
+      
+      <!-- List of pending requests -->
+      <div *ngIf="pendingStudents.length > 0" class="list-group">
+        <div *ngFor="let req of pendingStudents" class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <h6 class="mb-1">{{ req.student?.firstName }} {{ req.student?.lastName }}</h6>
+            <small class="text-secondary">{{ req.student?.email }}</small>
+            <br>
+            <small class="text-muted">Requested: {{ req.enrolledAt | date:'medium' }}</small>
+          </div>
+          <div>
+            <button class="btn btn-sm btn-success me-2" (click)="approveStudent(req.student?.AccountId)">
+              <i class="bi bi-check-circle"></i> Approve
+            </button>
+            <button class="btn btn-sm btn-danger" (click)="rejectStudent(req.student?.AccountId)">
+              <i class="bi bi-x-circle"></i> Reject
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Questions Tab -->
     <div *ngIf="activeTab === 'questions'">
@@ -89,10 +133,21 @@
       <div *ngIf="!loadingQuestions && questions.length > 0" class="questions-list">
         <div *ngFor="let question of questions" class="question-item mb-3">
           <div class="question-card">
+            <!-- Question Header with AI Relevance Badge -->
             <div class="d-flex justify-content-between align-items-start mb-2">
-              <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
-                <i class="bi bi-question-circle-fill me-1"></i>Question
-              </span>
+              <div>
+                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill me-2">
+                  <i class="bi bi-question-circle-fill me-1"></i>Question
+                </span>
+                <!-- AI Relevance Badge for Teachers -->
+                <span *ngIf="isTeacher() && question.aiRelevance !== undefined" 
+                      class="badge" 
+                      [ngClass]="question.aiRelevance ? 'bg-success' : 'bg-danger'"
+                      [title]="question.aiFeedback || 'No AI feedback'">
+                  <i class="bi me-1" [ngClass]="question.aiRelevance ? 'bi-check-circle' : 'bi-exclamation-triangle'"></i>
+                  {{ question.aiRelevance ? 'Relevant' : 'Not Relevant' }}
+                </span>
+              </div>
               <small class="text-secondary">
                 <i class="bi bi-clock me-1"></i>{{ question.createdAt | date:'medium' }}
               </small>

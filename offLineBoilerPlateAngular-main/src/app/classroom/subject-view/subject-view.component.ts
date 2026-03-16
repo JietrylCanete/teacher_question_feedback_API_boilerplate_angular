@@ -16,8 +16,10 @@ export class SubjectViewComponent implements OnInit {
   questions: any[] = [];
   students: any[] = [];
   account: Account | null;
+  pendingStudents: any[] = [];
+  loadingPending = false;
   
-  activeTab: 'questions' | 'students' = 'questions';
+  activeTab: 'questions' | 'students' | 'pending' = 'questions';
   
   loading = true;
   loadingQuestions = true;
@@ -47,7 +49,50 @@ export class SubjectViewComponent implements OnInit {
     
     if (this.isTeacher()) {
       this.loadStudents();
+      this.loadPendingStudents();
     }
+  }
+  
+  loadPendingStudents() {
+    this.loadingPending = true;
+    this.subjectService.getPendingStudents(this.subjectId)
+      .pipe(first())
+      .subscribe({
+        next: (students) => {
+          this.pendingStudents = students;
+          this.loadingPending = false;
+        },
+        error: (error) => {
+          console.error('Error loading pending students:', error);
+          this.alertService.error('Failed to load pending requests');
+          this.loadingPending = false;
+        }
+      });
+  }
+
+  approveStudent(studentId: number) {
+    this.subjectService.approveStudent(this.subjectId, studentId)
+      .pipe(first())
+      .subscribe({
+        next: () => {
+          this.alertService.success('Student approved');
+          this.loadPendingStudents(); // refresh pending list
+          this.loadStudents();        // refresh enrolled students list
+        },
+        error: (error) => this.alertService.error(error)
+      });
+  }
+
+  rejectStudent(studentId: number) {
+    this.subjectService.rejectStudent(this.subjectId, studentId)
+      .pipe(first())
+      .subscribe({
+        next: () => {
+          this.alertService.success('Student rejected');
+          this.loadPendingStudents(); // refresh pending list
+        },
+        error: (error) => this.alertService.error(error)
+      });
   }
 
   loadSubject() {
@@ -98,7 +143,7 @@ export class SubjectViewComponent implements OnInit {
       });
   }
 
-  setActiveTab(tab: 'questions' | 'students') {
+  setActiveTab(tab: 'questions' | 'students' | 'pending') {
     this.activeTab = tab;
   }
 

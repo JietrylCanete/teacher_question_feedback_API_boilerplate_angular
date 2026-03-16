@@ -50,4 +50,44 @@ Feedback: One short sentence explaining why.
   }
 }
 
-module.exports = { reviewAnswer };
+async function checkQuestionRelevance(subjectName, questionText) {
+  const prompt = `
+You are an educational content reviewer. Determine if the following question is relevant to the subject.
+
+Subject: "${subjectName}"
+Question: "${questionText}"
+
+Respond using this exact format:
+
+Relevant: Yes or No
+Feedback: One short sentence explaining why.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+
+    // Extract "Relevant"
+    const relevantMatch = raw.match(/relevant\s*:\s*(yes|no)/i);
+    const isRelevant = relevantMatch
+      ? relevantMatch[1].toLowerCase() === "yes"
+      : false;
+
+    // Extract "Feedback"
+    const feedbackMatch = raw.match(/feedback\s*:\s*(.*)/i);
+    let feedback = feedbackMatch ? feedbackMatch[1].trim() : "";
+
+    if (!feedback) {
+      feedback = raw.split(/[.\n]/)[0];
+    }
+
+    return { isRelevant, feedback };
+  } catch (err) {
+    console.error("Gemini AI Error (question relevance):", err);
+    return {
+      isRelevant: false,
+      feedback: "AI relevance check unavailable."
+    };
+  }
+}
+module.exports = { reviewAnswer, checkQuestionRelevance  };

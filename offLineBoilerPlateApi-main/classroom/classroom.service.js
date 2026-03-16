@@ -1,5 +1,6 @@
 const db = require('_helpers/db');
 const aiService = require('./ai.service');
+const { Op } = require('sequelize');
 
 module.exports = {
     createQuestion,
@@ -40,10 +41,17 @@ async function createQuestion(questionText, teacherId, subjectId, dueDate, point
         throw new Error('Subject ID is required');
     }
 
+    // Fetch subject details to get subject name for AI check
+    const subject = await db.Subject.findByPk(subjectId);
+    if (!subject) {
+        throw new Error('Subject not found');
+    }
+
+    // Prepare question data
     const questionData = { 
         questionText, 
         teacherId,
-        subjectId: subjectId, // Make sure this is set
+        subjectId,
         createdAt: new Date()
     };
     
@@ -51,14 +59,31 @@ async function createQuestion(questionText, teacherId, subjectId, dueDate, point
     if (dueDate) {
         questionData.dueDate = dueDate;
     }
-    
     if (points) {
         questionData.points = points;
     }
-    
+
+    // Call AI to check relevance
+    let aiResult = {
+        isRelevant: false,
+        feedback: 'AI relevance check unavailable.'
+    };
+    try {
+        aiResult = await aiService.checkQuestionRelevance(subject.subjectName, questionText);
+        console.log('AI relevance result:', aiResult);
+    } catch (err) {
+        console.error('AI relevance check failed:', err);
+        // Proceed without AI feedback
+    }
+
+    // Add AI results to question data
+    questionData.aiRelevance = aiResult.isRelevant;
+    questionData.aiFeedback = aiResult.feedback;
+
     console.log('Creating question with data:', questionData);
     
-    return await db.Question.create(questionData);
+    const question = await db.Question.create(questionData);
+    return question;
 }
 
 async function getQuestions(userId, userRole) {

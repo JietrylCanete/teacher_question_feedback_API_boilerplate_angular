@@ -24,7 +24,9 @@ function model(sequelize) {
         },
         dueDate: { type: DataTypes.DATE, allowNull: true },
         points: { type: DataTypes.INTEGER, defaultValue: 100 },
-        createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+        createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        aiRelevance: { type: DataTypes.BOOLEAN, allowNull: true },
+        aiFeedback: { type: DataTypes.TEXT, allowNull: true }
     };
 
     const options = {

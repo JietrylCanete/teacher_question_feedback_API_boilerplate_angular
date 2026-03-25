@@ -1,2 +1,41 @@
 /* Styles for create quiz page */
 
+.create-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-block;
+}
+
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
+
+.create-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.question-block textarea.form-control,
+.question-block .form-control,
+.question-block .form-select {
+  border-radius: 16px;
+}
+

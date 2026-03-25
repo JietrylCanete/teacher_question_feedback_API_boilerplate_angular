@@ -33,7 +33,9 @@
             ],
             "scripts": [
               "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"
-            ]
+            ],
+            "progress": false,
+            "verbose": false
           },
           "configurations": {
             "production": {
@@ -55,7 +57,9 @@
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "progress": false,
+              "verbose": false
             },
             "development": {
               "buildOptimizer": false,
@@ -63,7 +67,9 @@
               "vendorChunk": true,
               "extractLicenses": false,
               "sourceMap": true,
-              "namedChunks": true
+              "namedChunks": true,
+              "progress": false,
+              "verbose": false
             }
           },
           "defaultConfiguration": "production"

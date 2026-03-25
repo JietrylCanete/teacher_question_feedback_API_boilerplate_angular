@@ -880,7 +880,7 @@ function model(sequelize) {
 
 ================================================================================
 File: classroom\ai.service.js
-Size: 1.33 kB
+Size: 3.4 kB
 ================================================================================
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -935,11 +935,89 @@ Feedback: One short sentence explaining why.
   }
 }
 
-module.exports = { reviewAnswer };
+async function checkQuestionRelevance(subjectName, questionText) {
+  const prompt = `
+You are an educational content reviewer. Determine if the following question is relevant to the subject.
+
+Subject: "${subjectName}"
+Question: "${questionText}"
+
+Respond using this exact format:
+
+Relevant: Yes or No
+Feedback: One short sentence explaining why.
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+
+    // Extract "Relevant"
+    const relevantMatch = raw.match(/relevant\s*:\s*(yes|no)/i);
+    const isRelevant = relevantMatch
+      ? relevantMatch[1].toLowerCase() === "yes"
+      : false;
+
+    // Extract "Feedback"
+    const feedbackMatch = raw.match(/feedback\s*:\s*(.*)/i);
+    let feedback = feedbackMatch ? feedbackMatch[1].trim() : "";
+
+    if (!feedback) {
+      feedback = raw.split(/[.\n]/)[0];
+    }
+
+    return { isRelevant, feedback };
+  } catch (err) {
+    console.error("Gemini AI Error (question relevance):", err);
+    return {
+      isRelevant: false,
+      feedback: "AI relevance check unavailable."
+    };
+  }
+}
+
+async function generateMcqOptions(questionText, correctAnswer) {
+  const prompt = `
+You are helping a teacher create a multiple choice question.
+
+Question:
+"${questionText}"
+
+Correct answer:
+"${correctAnswer}"
+
+Generate 3 plausible but incorrect distractor options that are short (max 5 words each).
+Respond using this exact format (one line per option):
+
+Option1: ...
+Option2: ...
+Option3: ...
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+
+    const options = [];
+    const regex = /Option\d+\s*:\s*(.+)/gi;
+    let match;
+    while ((match = regex.exec(raw)) !== null) {
+      const opt = match[1].trim();
+      if (opt) options.push(opt);
+    }
+
+    return options;
+  } catch (err) {
+    console.error("Gemini AI Error (generate MCQ options):", err);
+    return [];
+  }
+}
+
+module.exports = { reviewAnswer, checkQuestionRelevance, generateMcqOptions };
 
 ================================================================================
 File: classroom\answer.model.js
-Size: 578 B
+Size: 702 B
 ================================================================================
 
 const { DataTypes } = require('sequelize');
@@ -952,6 +1030,8 @@ function model(sequelize) {
         questionId: { type: DataTypes.INTEGER, allowNull: false },
         studentId: { type: DataTypes.INTEGER, allowNull: false },
         answerText: { type: DataTypes.TEXT, allowNull: false },
+        // Score for this answer (for auto-graded questions)
+        score: { type: DataTypes.INTEGER, allowNull: true },
         submittedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
     };
 
@@ -960,13 +1040,14 @@ function model(sequelize) {
 
 ================================================================================
 File: classroom\classroom.controller.js
-Size: 2.27 kB
+Size: 3.36 kB
 ================================================================================
 
 const express = require('express');
 const router = express.Router();
 const authorize = require('_middleware/authorize');
 const classroomService = require('./classroom.service');
+const quizService = require('./quiz.service');
 
 // Existing routes
 router.post('/questions', authorize(), createQuestion);
@@ -980,21 +1061,29 @@ router.get('/questions/:id/answers', authorize(['Teacher', 'Admin']), getAnswers
 router.get('/questions/:id', authorize(), getQuestionById);
 router.get('/questions/:id/my-answer', authorize(), checkMyAnswer);
 
+// Quiz routes
+router.post('/quizzes', authorize(['Teacher', 'Admin']), createQuiz);
+router.get('/quizzes/:id', authorize(), getQuiz);
+router.post('/quizzes/:id/answers', authorize(['Student', 'User']), submitQuizAnswers);
+router.get('/quizzes/:id/results', authorize(['Teacher', 'Admin']), getQuizResults);
+
 function checkMyAnswer(req, res, next) {
     classroomService.checkMyAnswer(req.params.id, req.user.AccountId)
         .then(result => res.json(result))
         .catch(next);
 }
 function createQuestion(req, res, next) {
-    console.log('Create question request body:', req.body); // Debug log
-    console.log('User ID:', req.user.AccountId); // Debug log
+    //console.log('Create question request body:', req.body); // Debug log
+    //console.log('User ID:', req.user.AccountId); // Debug log
     
     classroomService.createQuestion(
         req.body.questionText, 
         req.user.AccountId,
         req.body.subjectId,
         req.body.dueDate,
-        req.body.points
+        req.body.points,
+        req.body.type,
+        req.body.options
     )
         .then(question => res.json(question))
         .catch(next);
@@ -1033,15 +1122,40 @@ function getAnswers(req, res, next) {
         .catch(next);
 }
 
+function createQuiz(req, res, next) {
+    quizService.createQuiz(req.user.AccountId, req.body)
+        .then(quiz => res.json(quiz))
+        .catch(next);
+}
+
+function getQuiz(req, res, next) {
+    quizService.getQuizById(req.params.id)
+        .then(quiz => res.json(quiz))
+        .catch(next);
+}
+
+function submitQuizAnswers(req, res, next) {
+    quizService.submitQuizAnswers(req.params.id, req.user.AccountId, req.body)
+        .then(result => res.json(result))
+        .catch(next);
+}
+
+function getQuizResults(req, res, next) {
+    quizService.getQuizResults(req.params.id)
+        .then(results => res.json(results))
+        .catch(next);
+}
+
 module.exports = router;
 
 ================================================================================
 File: classroom\classroom.service.js
-Size: 7.14 kB
+Size: 9.66 kB
 ================================================================================
 
 const db = require('_helpers/db');
 const aiService = require('./ai.service');
+const { Op } = require('sequelize');
 
 module.exports = {
     createQuestion,
@@ -1070,7 +1184,7 @@ async function checkMyAnswer(questionId, studentId) {
     };
 }
 
-async function createQuestion(questionText, teacherId, subjectId, dueDate, points) {
+async function createQuestion(questionText, teacherId, subjectId, dueDate, points, type, options) {
     // Validate required fields
     if (!questionText) {
         throw new Error('Question text is required');
@@ -1082,10 +1196,17 @@ async function createQuestion(questionText, teacherId, subjectId, dueDate, point
         throw new Error('Subject ID is required');
     }
 
+    // Fetch subject details to get subject name for AI check
+    const subject = await db.Subject.findByPk(subjectId);
+    if (!subject) {
+        throw new Error('Subject not found');
+    }
+
+    // Prepare question data
     const questionData = { 
         questionText, 
         teacherId,
-        subjectId: subjectId, // Make sure this is set
+        subjectId,
         createdAt: new Date()
     };
     
@@ -1093,69 +1214,124 @@ async function createQuestion(questionText, teacherId, subjectId, dueDate, point
     if (dueDate) {
         questionData.dueDate = dueDate;
     }
-    
     if (points) {
         questionData.points = points;
     }
-    
+
+    // Question type (default to ESSAY if not provided)
+    questionData.type = type || 'ESSAY';
+
+    // Serialize options for MCQ or other types that need them
+    if (options && Array.isArray(options) && options.length > 0) {
+        questionData.options = JSON.stringify(options);
+    }
+
+    // Call AI to check relevance
+    let aiResult = {
+        isRelevant: false,
+        feedback: 'AI relevance check unavailable.'
+    };
+    try {
+        aiResult = await aiService.checkQuestionRelevance(subject.subjectName, questionText);
+        console.log('AI relevance result:', aiResult);
+    } catch (err) {
+        console.error('AI relevance check failed:', err);
+        // Proceed without AI feedback
+    }
+
+    // Add AI results to question data
+    questionData.aiRelevance = aiResult.isRelevant;
+    questionData.aiFeedback = aiResult.feedback;
+
     console.log('Creating question with data:', questionData);
     
-    return await db.Question.create(questionData);
+    const question = await db.Question.create(questionData);
+
+    // Normalize options in returned object
+    const plain = question.toJSON();
+    if (plain.options) {
+        try {
+            plain.options = JSON.parse(plain.options);
+        } catch {
+            // leave as-is if parsing fails
+        }
+    }
+
+    return plain;
 }
 
 async function getQuestions(userId, userRole) {
-    const questions = await db.Question.findAll({ 
+    const isStudent = userRole === 'Student' || userRole === 'User';
+
+    const whereClause = {
+        quizId: { [Op.is]: null }
+    };
+
+    if (isStudent) {
+        const enrollments = await db.SubjectEnrollment.findAll({
+            where: { studentId: userId, status: 'active' },
+            attributes: ['subjectId']
+        });
+        const enrolledSubjectIds = enrollments.map(e => e.subjectId);
+        if (enrolledSubjectIds.length === 0) {
+            return [];
+        }
+        whereClause.subjectId = { [Op.in]: enrolledSubjectIds };
+    }
+
+    const questions = await db.Question.findAll({
+        where: whereClause,
         order: [['createdAt', 'DESC']],
-        include: [{
-            model: db.Account,
-            as: 'teacher',
-            attributes: ['firstName', 'lastName', 'email']
-        }]
+        include: [
+            {
+                model: db.Account,
+                as: 'teacher',
+                attributes: ['firstName', 'lastName', 'email']
+            },
+            {
+                model: db.Subject,
+                attributes: ['subjectId', 'subjectName', 'subjectCode']
+            }
+        ]
     });
-    
-    // If user is a student or regular user, check which questions they've answered
-    if (userRole === 'Student' || userRole === 'User') {
+
+    let answeredIds = [];
+    if (isStudent) {
         const answeredQuestions = await db.Answer.findAll({
             where: { studentId: userId },
             attributes: ['questionId']
         });
-        
-        const answeredIds = answeredQuestions.map(a => a.questionId);
-        
-        // Add hasAnswered flag and teacher name to each question
-        return questions.map(q => {
-            const question = q.toJSON();
-            question.hasAnswered = answeredIds.includes(q.questionId);
-            
-            // Format teacher name
-            if (question.teacher) {
-                question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
-            } else {
-                // Fallback if teacher not found
-                question.teacherName = 'Unknown Teacher';
-            }
-            
-            // Remove the teacher object to keep response clean
-            delete question.teacher;
-            
-            return question;
-        });
+        answeredIds = answeredQuestions.map(a => a.questionId);
     }
-    
-    // For teachers and admins, just return the questions with teacher info
+
     return questions.map(q => {
         const question = q.toJSON();
-        
-        // Format teacher name
+
+        if (question.Subject) {
+            question.subjectName = question.Subject.subjectName;
+            question.subjectCode = question.Subject.subjectCode;
+            delete question.Subject;
+        }
+
         if (question.teacher) {
             question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+            delete question.teacher;
         } else {
             question.teacherName = 'Unknown Teacher';
         }
-        
-        // Remove the teacher object to keep response clean
-        delete question.teacher;
-        
+
+        if (question.options) {
+            try {
+                question.options = JSON.parse(question.options);
+            } catch {
+                // keep raw value if parsing fails
+            }
+        }
+
+        if (isStudent) {
+            question.hasAnswered = answeredIds.includes(question.questionId);
+        }
+
         return question;
     });
 }
@@ -1179,6 +1355,15 @@ async function getQuestionById(questionId) {
             questionData.teacherName = 'Unknown Teacher';
         }
         
+        // Parse options if present
+        if (questionData.options) {
+            try {
+                questionData.options = JSON.parse(questionData.options);
+            } catch {
+                // keep raw value if parsing fails
+            }
+        }
+
         // Remove the teacher object to keep response clean
         delete questionData.teacher;
         
@@ -1258,11 +1443,16 @@ async function getAnswersByQuestionId(questionId, requestingUserId, requestingUs
         whereClause.studentId = requestingUserId;
     }
 
-    // Get all answers for this question with their AI reviews
+    // Get all answers for this question with their AI reviews and student info
     const answers = await db.Answer.findAll({
         where: whereClause,
         include: [{
             model: db.AIReview,
+            required: false
+        }, {
+            model: db.Account,
+            as: 'student',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email'],
             required: false
         }],
         order: [['submittedAt', 'DESC']]
@@ -1282,6 +1472,16 @@ async function getAnswersByQuestionId(questionId, requestingUserId, requestingUs
             answerData.aiReview = answerData.AIReview;
             delete answerData.AIReview;
         }
+
+        // Normalize student info
+        if (answerData.student) {
+            answerData.student = {
+                AccountId: answerData.student.AccountId,
+                firstName: answerData.student.firstName,
+                lastName: answerData.student.lastName,
+                email: answerData.student.email
+            };
+        }
         
         return answerData;
     });
@@ -1289,7 +1489,7 @@ async function getAnswersByQuestionId(questionId, requestingUserId, requestingUs
 
 ================================================================================
 File: classroom\question.model.js
-Size: 1.05 kB
+Size: 1.87 kB
 ================================================================================
 
 const { DataTypes } = require('sequelize');
@@ -1299,6 +1499,14 @@ module.exports = model;
 function model(sequelize) {
     const attributes = {
         questionId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        quizId: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'Quizzes',
+                key: 'quizId'
+            }
+        },
         subjectId: { 
             type: DataTypes.INTEGER, 
             allowNull: false,
@@ -1308,6 +1516,22 @@ function model(sequelize) {
             }
         },
         questionText: { type: DataTypes.TEXT, allowNull: false },
+        // Question type (e.g. ESSAY, MCQ)
+        type: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: 'ESSAY'
+        },
+        // Optional serialized options for types like MCQ
+        options: {
+            type: DataTypes.TEXT,
+            allowNull: true
+        },
+        // For auto-graded questions like MCQ
+        correctAnswer: {
+            type: DataTypes.TEXT,
+            allowNull: true
+        },
         teacherId: { 
             type: DataTypes.INTEGER, 
             allowNull: false,
@@ -1318,7 +1542,9 @@ function model(sequelize) {
         },
         dueDate: { type: DataTypes.DATE, allowNull: true },
         points: { type: DataTypes.INTEGER, defaultValue: 100 },
-        createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+        createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        aiRelevance: { type: DataTypes.BOOLEAN, allowNull: true },
+        aiFeedback: { type: DataTypes.TEXT, allowNull: true }
     };
 
     const options = {
@@ -1329,8 +1555,270 @@ function model(sequelize) {
 }
 
 ================================================================================
+File: classroom\quiz.model.js
+Size: 836 B
+================================================================================
+
+const { DataTypes } = require('sequelize');
+
+module.exports = model;
+
+function model(sequelize) {
+    const attributes = {
+        quizId: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        subjectId: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'Subjects',
+                key: 'subjectId'
+            }
+        },
+        title: { type: DataTypes.STRING, allowNull: false },
+        description: { type: DataTypes.TEXT, allowNull: true },
+        totalPoints: { type: DataTypes.INTEGER, allowNull: true },
+        createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    };
+
+    return sequelize.define('Quiz', attributes, { timestamps: false });
+}
+
+
+
+================================================================================
+File: classroom\quiz.service.js
+Size: 6.04 kB
+================================================================================
+
+const db = require('_helpers/db');
+const aiService = require('./ai.service');
+
+module.exports = {
+    createQuiz,
+    getQuizById,
+    submitQuizAnswers,
+    getQuizResults
+};
+
+async function createQuiz(teacherId, quizData) {
+    const { subjectId, title, description, questions } = quizData;
+
+    if (!subjectId) throw new Error('subjectId is required');
+    if (!title) throw new Error('title is required');
+    if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error('At least one question is required');
+    }
+
+    // Create quiz
+    const quiz = await db.Quiz.create({
+        subjectId,
+        title,
+        description: description || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+    });
+
+    let totalPoints = 0;
+
+    // Create questions linked to this quiz
+    for (const q of questions) {
+        if (!q.questionText) continue;
+
+        let options = Array.isArray(q.options) ? q.options.filter(o => !!o) : [];
+        const points = q.points || 1;
+
+        // If teacher did not provide options, use AI to generate distractors
+        if (options.length === 0 && q.correctAnswer) {
+            const aiOptions = await aiService.generateMcqOptions(q.questionText, q.correctAnswer);
+            options = [q.correctAnswer, ...aiOptions];
+        }
+
+        totalPoints += points;
+
+        const questionData = {
+            quizId: quiz.quizId,
+            subjectId,
+            teacherId,
+            questionText: q.questionText,
+            type: 'MCQ',
+            options: options.length ? JSON.stringify(options) : null,
+            correctAnswer: q.correctAnswer || null,
+            points,
+            createdAt: new Date()
+        };
+
+        await db.Question.create(questionData);
+    }
+
+    // Update quiz with totalPoints
+    quiz.totalPoints = totalPoints;
+    await quiz.save();
+
+    return getQuizById(quiz.quizId);
+}
+
+async function getQuizById(quizId) {
+    const quiz = await db.Quiz.findByPk(quizId, {
+        include: [{
+            model: db.Question,
+            order: [['questionId', 'ASC']]
+        }]
+    });
+
+    if (!quiz) {
+        throw new Error('Quiz not found');
+    }
+
+    const quizData = quiz.toJSON();
+    if (quizData.Questions) {
+        quizData.questions = quizData.Questions.map(q => {
+            const question = q;
+            if (question.options && typeof question.options === 'string') {
+                try {
+                    question.options = JSON.parse(question.options);
+                } catch {
+                    // keep raw
+                }
+            }
+            return question;
+        });
+        delete quizData.Questions;
+    }
+
+    return quizData;
+}
+
+async function submitQuizAnswers(quizId, studentId, payload) {
+    const quiz = await db.Quiz.findByPk(quizId, {
+        include: [db.Question]
+    });
+
+    if (!quiz) {
+        throw new Error('Quiz not found');
+    }
+
+    const questions = quiz.Questions || [];
+    if (!Array.isArray(payload.answers)) {
+        throw new Error('answers must be an array');
+    }
+
+    // Prevent multiple submissions: if the student has already answered
+    // any question in this quiz, block a new submission
+    const quizQuestionIds = questions.map(q => q.questionId);
+    const existing = await db.Answer.findOne({
+        where: {
+            questionId: quizQuestionIds,
+            studentId
+        }
+    });
+    if (existing) {
+        throw new Error('You have already submitted this quiz.');
+    }
+
+    const answersByQuestionId = new Map();
+    for (const a of payload.answers) {
+        if (!a.questionId) continue;
+        answersByQuestionId.set(a.questionId, a.answerText);
+    }
+
+    let totalScore = 0;
+    let maxScore = 0;
+    const results = [];
+
+    for (const question of questions) {
+        const q = question.toJSON();
+        const userAnswer = answersByQuestionId.get(q.questionId);
+        const points = q.points || 1;
+        maxScore += points;
+
+        if (!userAnswer) {
+            results.push({
+                questionId: q.questionId,
+                correct: false,
+                pointsEarned: 0,
+                pointsPossible: points
+            });
+            continue;
+        }
+
+        // Save answer
+        const isCorrect = q.correctAnswer != null &&
+            String(userAnswer).trim() === String(q.correctAnswer).trim();
+
+        const score = isCorrect ? points : 0;
+        totalScore += score;
+
+        await db.Answer.create({
+            questionId: q.questionId,
+            studentId,
+            answerText: userAnswer,
+            score,
+            submittedAt: new Date()
+        });
+
+        results.push({
+            questionId: q.questionId,
+            correct: isCorrect,
+            pointsEarned: score,
+            pointsPossible: points
+        });
+    }
+
+    return {
+        quizId,
+        studentId,
+        totalScore,
+        maxScore,
+        results
+    };
+}
+
+async function getQuizResults(quizId) {
+    const quiz = await db.Quiz.findByPk(quizId, {
+        include: [db.Question]
+    });
+
+    if (!quiz) {
+        throw new Error('Quiz not found');
+    }
+
+    const questions = quiz.Questions || [];
+    const questionIds = questions.map(q => q.questionId);
+
+    const answers = await db.Answer.findAll({
+        where: { questionId: questionIds },
+        include: [{
+            model: db.Account,
+            as: 'student',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email']
+        }],
+        order: [['submittedAt', 'DESC']]
+    });
+
+    return {
+        quiz: quiz.toJSON(),
+        questions: questions.map(q => q.toJSON()),
+        answers: answers.map(a => {
+            const data = a.toJSON();
+            if (data.student) {
+                data.student = {
+                    AccountId: data.student.AccountId,
+                    firstName: data.student.firstName,
+                    lastName: data.student.lastName,
+                    email: data.student.email
+                };
+            }
+            return data;
+        })
+    };
+}
+
+
+
+================================================================================
 File: classroom\subject-enrollment.model.js
-Size: 627 B
+Size: 639 B
 ================================================================================
 
 const { DataTypes } = require('sequelize');
@@ -1343,7 +1831,7 @@ function model(sequelize) {
         subjectId: { type: DataTypes.INTEGER, allowNull: false },
         studentId: { type: DataTypes.INTEGER, allowNull: false },
         enrolledAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-        status: { type: DataTypes.ENUM('active', 'completed', 'dropped'), defaultValue: 'active' }
+        status: { type: DataTypes.ENUM('active', 'completed', 'dropped', 'pending'), defaultValue: 'pending' }
     };
 
     return sequelize.define('SubjectEnrollment', attributes, { timestamps: false });
@@ -1351,7 +1839,7 @@ function model(sequelize) {
 
 ================================================================================
 File: classroom\subject.controller.js
-Size: 3.92 kB
+Size: 5.16 kB
 ================================================================================
 
 const express = require('express');
@@ -1375,13 +1863,19 @@ router.get('/:subjectId/students', authorize(['Teacher', 'Admin']), getSubjectSt
 
 // Subject questions
 router.get('/:subjectId/questions', authorize(), getSubjectQuestions);
+router.get('/:subjectId/quizzes', authorize(), getSubjectQuizzes);
+
+// Teacher approval routes
+router.get('/:subjectId/pending-students', authorize(['Teacher', 'Admin']), getPendingStudents);
+router.put('/:subjectId/approve/:studentId', authorize(['Teacher', 'Admin']), approveStudent);
+router.put('/:subjectId/reject/:studentId', authorize(['Teacher', 'Admin']), rejectStudent);
 
 module.exports = router;
 
 // Controller functions
 function getSubjects(req, res, next) {
-    console.log('GET /subjects called');
-    console.log('User data:', req.user);
+    //console.log('GET /subjects called');
+    //console.log('User data:', req.user);
     
     subjectService.getAll(req.user.AccountId, req.user.role)
         .then(subjects => {
@@ -1389,7 +1883,7 @@ function getSubjects(req, res, next) {
             res.json(subjects);
         })
         .catch(error => {
-            console.error('Error in getSubjects:', error);
+            //console.error('Error in getSubjects:', error);
             res.status(500).json({ 
                 message: error.message || 'Failed to fetch subjects',
                 error: error.toString()
@@ -1398,7 +1892,7 @@ function getSubjects(req, res, next) {
 }
 
 function getMySubjects(req, res, next) {
-    console.log('GET /my-subjects called');
+    //console.log('GET /my-subjects called');
     subjectService.getMySubjects(req.user.AccountId, req.user.role)
         .then(subjects => res.json(subjects))
         .catch(next);
@@ -1462,6 +1956,30 @@ function getSubjectQuestions(req, res, next) {
         .catch(next);
 }
 
+function getSubjectQuizzes(req, res, next) {
+    subjectService.getSubjectQuizzes(req.params.subjectId, req.user.AccountId, req.user.role)
+        .then(quizzes => res.json(quizzes))
+        .catch(next);
+}
+
+function getPendingStudents(req, res, next) {
+    subjectService.getPendingStudents(req.params.subjectId)
+        .then(students => res.json(students))
+        .catch(next);
+}
+
+function approveStudent(req, res, next) {
+    subjectService.approveStudent(req.params.subjectId, req.params.studentId)
+        .then(() => res.json({ message: 'Student approved successfully' }))
+        .catch(next);
+}
+
+function rejectStudent(req, res, next) {
+    subjectService.rejectStudent(req.params.subjectId, req.params.studentId)
+        .then(() => res.json({ message: 'Student rejected successfully' }))
+        .catch(next);
+}
+
 ================================================================================
 File: classroom\subject.model.js
 Size: 889 B
@@ -1489,7 +2007,7 @@ function model(sequelize) {
 
 ================================================================================
 File: classroom\subject.service.js
-Size: 13.49 kB
+Size: 18.82 kB
 ================================================================================
 
 const db = require('_helpers/db');
@@ -1514,9 +2032,6 @@ async function createSubject(params) {
 
 async function getAll(userId, userRole) {
     try {
-        //console.log('=== getAll subjects service ===');
-        //console.log('Received userId:', userId, 'userRole:', userRole);
-        
         // First, check if Subjects table has data
         const subjects = await db.Subject.findAll({
             include: [{
@@ -1527,71 +2042,98 @@ async function getAll(userId, userRole) {
             order: [['createdAt', 'DESC']]
         });
 
-        //console.log(`Found ${subjects.length} total subjects in database`);
-        
         if (subjects.length === 0) {
-            console.log('No subjects found in database');
             return [];
         }
 
-// If user is a student, check enrollment status for each subject
-if (userRole === 'Student' || userRole === 'User') {
-    //console.log('User is student, checking enrollments for userId:', userId);
-    
-    const enrollments = await db.SubjectEnrollment.findAll({
-        where: { 
-            studentId: userId,
-            status: 'active'
-        },
-        attributes: ['subjectId']
-    });
-    
-    const enrolledSubjectIds = enrollments.map(e => e.subjectId);
-    //console.log('Student is enrolled in subject IDs:', enrolledSubjectIds);
-    
-    const result = await Promise.all(subjects.map(async (subject) => {
-        const subjectData = subject.toJSON();
-        subjectData.isEnrolled = enrolledSubjectIds.includes(subject.subjectId);
-        
-        // Add student count
-        const studentCount = await db.SubjectEnrollment.count({
-            where: { 
-                subjectId: subject.subjectId,
-                status: 'active'
-            }
-        });
-        subjectData.studentCount = studentCount;
-        
-        // Add question count
-        const questionCount = await db.Question.count({
-            where: { subjectId: subject.subjectId }
-        });
-        subjectData.questionCount = questionCount;
-        
-        if (subjectData.teacher) {
-            subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
-            delete subjectData.teacher;
-        }
-        
-        return subjectData;
-    }));
-    
-    console.log('Returning subjects with enrollment status');
-    return result;
-}
+        // If user is a student, check enrollment status for each subject
+        if (userRole === 'Student' || userRole === 'User') {
+            // Get active (approved) enrollments
+            const activeEnrollments = await db.SubjectEnrollment.findAll({
+                where: { 
+                    studentId: userId,
+                    status: 'active'
+                },
+                attributes: ['subjectId']
+            });
+            
+            // Get pending enrollments
+            const pendingEnrollments = await db.SubjectEnrollment.findAll({
+                where: { 
+                    studentId: userId,
+                    status: 'pending'
+                },
+                attributes: ['subjectId']
+            });
+            
+            const activeSubjectIds = activeEnrollments.map(e => e.subjectId);
+            const pendingSubjectIds = pendingEnrollments.map(e => e.subjectId);
+            
+            const baseResult = subjects.map(subject => {
+                const subjectData = subject.toJSON();
+                subjectData.isEnrolled = activeSubjectIds.includes(subject.subjectId);
+                subjectData.isPending = pendingSubjectIds.includes(subject.subjectId);
+                
+                if (subjectData.teacher) {
+                    subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
+                    delete subjectData.teacher;
+                }
+                
+                return subjectData;
+            });
 
-        // For teachers/admins
-        //console.log('User is teacher/admin, returning all subjects without enrollment status');
-        return subjects.map(subject => {
+            // Add student/question counts for each subject
+            const withStats = await Promise.all(baseResult.map(async (subjectData) => {
+                const studentCount = await db.SubjectEnrollment.count({
+                    where: { 
+                        subjectId: subjectData.subjectId,
+                        status: 'active'
+                    }
+                });
+                
+                const questionCount = await db.Question.count({
+                    where: { subjectId: subjectData.subjectId }
+                });
+
+                return {
+                    ...subjectData,
+                    studentCount,
+                    questionCount
+                };
+            }));
+
+            return withStats;
+        }
+
+        // For teachers/admins, also include student/question counts
+        const teacherResult = await Promise.all(subjects.map(async (subject) => {
             const subjectData = subject.toJSON();
             if (subjectData.teacher) {
                 subjectData.teacherName = `${subjectData.teacher.firstName} ${subjectData.teacher.lastName}`;
                 delete subjectData.teacher;
             }
-            return subjectData;
-        });
+
+            const studentCount = await db.SubjectEnrollment.count({
+                where: { 
+                    subjectId: subjectData.subjectId,
+                    status: 'active'
+                }
+            });
+            
+            const questionCount = await db.Question.count({
+                where: { subjectId: subjectData.subjectId }
+            });
+
+            return {
+                ...subjectData,
+                studentCount,
+                questionCount
+            };
+        }));
+
+        return teacherResult;
     } catch (error) {
-        console.error('ERROR in getAll service:', error);
+        //console.error('ERROR in getAll service:', error);
         throw new Error(`Failed to fetch subjects: ${error.message}`);
     }
 }
@@ -1685,17 +2227,24 @@ async function getSubjectById(subjectId, userId, userRole) {
     const subjectData = formatSubject(subject);
 
     // Check if user is enrolled (for students)
-    if (userRole === 'Student' || userRole === 'User') {
-        const enrollment = await db.SubjectEnrollment.findOne({
-            where: {
-                subjectId: subjectId,
-                studentId: userId,
-                status: 'active'
-            }
-        });
-        subjectData.isEnrolled = !!enrollment;
-    }
-
+if (userRole === 'Student' || userRole === 'User') {
+    const activeEnrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId: subjectId,
+            studentId: userId,
+            status: 'active'
+        }
+    });
+    const pendingEnrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId: subjectId,
+            studentId: userId,
+            status: 'pending'
+        }
+    });
+    subjectData.isEnrolled = !!activeEnrollment;
+    subjectData.isPending = !!pendingEnrollment;
+}
     // Get stats
     subjectData.studentCount = await db.SubjectEnrollment.count({
         where: { 
@@ -1761,42 +2310,39 @@ async function enrollStudent(subjectId, studentId) {
         throw new Error('Subject not found');
     }
 
-    // Check if already enrolled
+    // Check if already enrolled or pending
     const existingEnrollment = await db.SubjectEnrollment.findOne({
-        where: {
-            subjectId,
-            studentId,
-            status: 'active'
-        }
-    });
-
-    if (existingEnrollment) {
-        throw new Error('Student is already enrolled in this subject');
-    }
-
-    // Check if previously dropped/enrolled
-    const previousEnrollment = await db.SubjectEnrollment.findOne({
         where: {
             subjectId,
             studentId
         }
     });
 
-    if (previousEnrollment) {
-        // Reactivate if previously enrolled
-        previousEnrollment.status = 'active';
-        await previousEnrollment.save();
-    } else {
-        // Create new enrollment
-        await db.SubjectEnrollment.create({
-            subjectId,
-            studentId,
-            enrolledAt: new Date(),
-            status: 'active'
-        });
+    if (existingEnrollment) {
+        if (existingEnrollment.status === 'active') {
+            throw new Error('You are already enrolled in this subject');
+        }
+        if (existingEnrollment.status === 'pending') {
+            throw new Error('Your enrollment request is already pending approval');
+        }
+        if (existingEnrollment.status === 'dropped') {
+            // Re-enroll by setting to pending
+            existingEnrollment.status = 'pending';
+            existingEnrollment.enrolledAt = new Date();
+            await existingEnrollment.save();
+            return { message: 'Enrollment request submitted for approval' };
+        }
     }
 
-    return { message: 'Successfully enrolled in subject' };
+    // Create new enrollment with pending status
+    await db.SubjectEnrollment.create({
+        subjectId,
+        studentId,
+        enrolledAt: new Date(),
+        status: 'pending'
+    });
+
+    return { message: 'Enrollment request submitted for approval' };
 }
 
 async function removeStudent(subjectId, studentId) {
@@ -1860,8 +2406,12 @@ async function getSubjectQuestions(subjectId, userId, userRole) {
         }
     }
 
+    // Standalone subject questions only — quiz items are linked via quizId and belong on the quiz UI
     const questions = await db.Question.findAll({
-        where: { subjectId },
+        where: {
+            subjectId,
+            quizId: { [Op.is]: null }
+        },
         include: [{
             model: db.Account,
             as: 'teacher',
@@ -1914,6 +2464,70 @@ function formatSubject(subject) {
     return subjectData;
 }
 
+async function approveStudent(subjectId, studentId) {
+    const enrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId,
+            studentId,
+            status: 'pending'
+        }
+    });
+
+    if (!enrollment) {
+        throw new Error('Pending enrollment not found');
+    }
+
+    enrollment.status = 'active';
+    await enrollment.save();
+
+    return { message: 'Student approved successfully' };
+}
+
+async function rejectStudent(subjectId, studentId) {
+    const enrollment = await db.SubjectEnrollment.findOne({
+        where: {
+            subjectId,
+            studentId,
+            status: 'pending'
+        }
+    });
+
+    if (!enrollment) {
+        throw new Error('Pending enrollment not found');
+    }
+
+    enrollment.status = 'dropped'; // or you could use 'rejected' if you add that enum
+    await enrollment.save();
+
+    return { message: 'Student rejected successfully' };
+}
+
+async function getPendingStudents(subjectId) {
+    const enrollments = await db.SubjectEnrollment.findAll({
+        where: {
+            subjectId,
+            status: 'pending'
+        },
+        include: [{
+            model: db.Account,
+            as: 'student',
+            attributes: ['AccountId', 'firstName', 'lastName', 'email']
+        }],
+        order: [['enrolledAt', 'DESC']]
+    });
+
+    return enrollments.map(e => ({
+        enrollmentId: e.enrollmentId,
+        enrolledAt: e.enrolledAt,
+        student: e.student ? {
+            AccountId: e.student.AccountId,
+            firstName: e.student.firstName,
+            lastName: e.student.lastName,
+            email: e.student.email
+        } : null
+    }));
+}
+
 // Export all functions at the END
 module.exports = {
     createSubject,
@@ -1925,8 +2539,75 @@ module.exports = {
     enrollStudent,
     removeStudent,
     getSubjectStudents,
-    getSubjectQuestions
+    getSubjectQuestions,
+    getSubjectQuizzes,
+    approveStudent,
+    rejectStudent,
+    getPendingStudents
 };
+
+async function getSubjectQuizzes(subjectId, userId, userRole) {
+    // Students/users must be enrolled to view quizzes in the subject
+    if (userRole === 'Student' || userRole === 'User') {
+        const enrollment = await db.SubjectEnrollment.findOne({
+            where: {
+                subjectId,
+                studentId: userId,
+                status: 'active'
+            }
+        });
+        if (!enrollment) {
+            throw new Error('You are not enrolled in this subject');
+        }
+    }
+
+    const quizzes = await db.Quiz.findAll({
+        where: { subjectId },
+        order: [['createdAt', 'DESC']]
+    });
+
+    // For students/users, mark quizzes they have already submitted
+    if (userRole === 'Student' || userRole === 'User') {
+        const quizIds = quizzes.map(q => q.quizId);
+        if (!quizIds.length) {
+            return quizzes.map(q => q.toJSON());
+        }
+
+        const quizQuestions = await db.Question.findAll({
+            where: { quizId: quizIds },
+            attributes: ['quizId', 'questionId']
+        });
+
+        const questionIds = quizQuestions.map(q => q.questionId);
+        if (!questionIds.length) {
+            return quizzes.map(q => q.toJSON());
+        }
+
+        const answered = await db.Answer.findAll({
+            where: {
+                studentId: userId,
+                questionId: questionIds
+            },
+            attributes: ['questionId']
+        });
+
+        const answeredQuestionIds = new Set(answered.map(a => a.questionId));
+        const submittedQuizIds = new Set(
+            quizQuestions
+                .filter(q => answeredQuestionIds.has(q.questionId))
+                .map(q => q.quizId)
+        );
+
+        return quizzes.map(q => {
+            const data = q.toJSON();
+            data.hasSubmitted = submittedQuizIds.has(q.quizId);
+            return data;
+        });
+    }
+
+    // Teachers/admins: just return quizzes
+    return quizzes.map(q => q.toJSON());
+}
 
 ================================================================================
 File: config.json
@@ -2830,7 +3511,7 @@ components:
 
 ================================================================================
 File: _helpers\db.js
-Size: 3.52 kB
+Size: 4.03 kB
 ================================================================================
 
 const config = require('config.json');
@@ -2861,9 +3542,12 @@ async function initialize() {
     db.ActivityLog = require('../models/activitylog.model')(sequelize);
 
     // Classroom models
+    db.Quiz = require('../classroom/quiz.model')(sequelize);
     db.Question = require('../classroom/question.model')(sequelize);
     db.Answer = require('../classroom/answer.model')(sequelize);
     db.AIReview = require('../classroom/ai-review.model')(sequelize);
+    db.Subject = require('../classroom/subject.model')(sequelize);
+    db.SubjectEnrollment = require('../classroom/subject-enrollment.model')(sequelize);
 
     // Define relationships
     db.Account.hasMany(db.RefreshToken, { foreignKey: 'AccountId', onDelete: 'CASCADE' });
@@ -2873,41 +3557,53 @@ async function initialize() {
     db.Preferences.belongsTo(db.Account, { foreignKey: 'AccountId' });
 
     // Classroom relationships
+    // Quiz <-> Subject
+    db.Subject.hasMany(db.Quiz, { foreignKey: 'subjectId' });
+    db.Quiz.belongsTo(db.Subject, { foreignKey: 'subjectId' });
+
+    // Quiz <-> Question
+    db.Quiz.hasMany(db.Question, { foreignKey: 'quizId' });
+    db.Question.belongsTo(db.Quiz, { foreignKey: 'quizId' });
+
+    // Question <-> Answer
     db.Question.hasMany(db.Answer, { foreignKey: 'questionId' });
     db.Answer.belongsTo(db.Question, { foreignKey: 'questionId' });
 
+    // Answer <-> AIReview
     db.Answer.hasOne(db.AIReview, { foreignKey: 'answerId' });
     db.AIReview.belongsTo(db.Answer, { foreignKey: 'answerId' });
-    // Add this to the relationships section in initialize() function
-    // Add teacher relationship
+
+    // Student relationships for answers
+    db.Account.hasMany(db.Answer, { foreignKey: 'studentId', as: 'answers' });
+    db.Answer.belongsTo(db.Account, { foreignKey: 'studentId', as: 'student' });
+
+    // Teacher relationship for questions
     db.Account.hasMany(db.Question, { foreignKey: 'teacherId', as: 'questions' });
     db.Question.belongsTo(db.Account, { foreignKey: 'teacherId', as: 'teacher' });
-    // Add these to your relationships section
-    // Subject relationships
-    db.Subject = require('../classroom/subject.model')(sequelize);
-    db.SubjectEnrollment = require('../classroom/subject-enrollment.model')(sequelize);
+
     // Subject relationships
     db.Account.hasMany(db.Subject, { foreignKey: 'teacherId', as: 'taughtSubjects' });
     db.Subject.belongsTo(db.Account, { foreignKey: 'teacherId', as: 'teacher' });
+
     // Enrollment relationships
     db.Subject.belongsToMany(db.Account, { 
-    through: db.SubjectEnrollment, 
-    foreignKey: 'subjectId', 
-    otherKey: 'studentId',
-    as: 'students'
+        through: db.SubjectEnrollment, 
+        foreignKey: 'subjectId', 
+        otherKey: 'studentId',
+        as: 'students'
     });
     db.Account.belongsToMany(db.Subject, { 
-    through: db.SubjectEnrollment, 
-    foreignKey: 'studentId', 
-    otherKey: 'subjectId',
-    as: 'enrolledSubjects' 
+        through: db.SubjectEnrollment, 
+        foreignKey: 'studentId', 
+        otherKey: 'subjectId',
+        as: 'enrolledSubjects' 
     });
     db.Subject.hasMany(db.SubjectEnrollment, { foreignKey: 'subjectId' });
     db.SubjectEnrollment.belongsTo(db.Subject, { foreignKey: 'subjectId' });
     db.Account.hasMany(db.SubjectEnrollment, { foreignKey: 'studentId' });
     db.SubjectEnrollment.belongsTo(db.Account, { foreignKey: 'studentId', as: 'student' });
 
-    // Update Question relationships
+    // Subject <-> Question
     db.Subject.hasMany(db.Question, { foreignKey: 'subjectId' });
     db.Question.belongsTo(db.Subject, { foreignKey: 'subjectId' });
 

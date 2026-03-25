@@ -7,7 +7,7 @@
         "build": "ng build",
         "watch": "ng build --watch --configuration development",
         "test": "ng test",
-        "export:all": "folder2txt --output frontend.txt C:/UsersMY PC/OneDrive/Documents/JAVA/Extra/offLineBoilerPlateAngular-main --exclude node_modules --exclude .angular --exclude .vscode --exclude .git"
+        "export:all": "folder2txt --output frontend.txt C:/UsersMY PC/OneDrive/Documents/JAVA/Extra/offLineBoilerPlateAngular-main --exclude node_modules --exclude .angular --exclude .vscode --exclude .git --exclude dist"
     },
     "private": true,
     "dependencies": {

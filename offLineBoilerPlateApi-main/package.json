@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "export:all": "folder2txt --output backend.txt C:/UsersMY PC/OneDrive/Documents/JAVA/Extra/offLineBoilerPlateApi-main --exclude node_modules --exclude .angular --exclude .vscode --exclude .git"
+    "export:all": "folder2txt --output backend.txt C:/UsersMY PC/OneDrive/Documents/JAVA/Extra/offLineBoilerPlateApi-main"
   },
   "keywords": [],
   "author": "",

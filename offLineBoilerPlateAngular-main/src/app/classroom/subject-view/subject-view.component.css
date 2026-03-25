@@ -30,6 +30,26 @@
   border: 1px solid rgba(0,0,0,0.05);
 }
 
+/* Inline notice: pending enrollment requests (teachers) */
+.pending-enrollment-notice {
+  background: linear-gradient(90deg, #fff8e6 0%, #fff3cd 100%);
+  border: 1px solid #ffc107;
+  border-radius: 12px;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  color: #664d03;
+}
+
+.pending-enrollment-notice__icon {
+  color: #997404;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.pending-enrollment-notice__text strong {
+  color: #664d03;
+}
+
 .stats-box {
   background: #f8f9fa;
   padding: 1.5rem;

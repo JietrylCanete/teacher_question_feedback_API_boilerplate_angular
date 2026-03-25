@@ -53,6 +53,29 @@
       </div>
     </div>
 
+    <!-- Teacher: compact notice when students are waiting for enrollment approval -->
+    <div *ngIf="isTeacher() && !loadingPending && pendingStudents.length > 0"
+         class="pending-enrollment-notice mb-3"
+         role="status">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+          <span class="pending-enrollment-notice__icon" aria-hidden="true">
+            <i class="bi bi-bell-fill"></i>
+          </span>
+          <span class="pending-enrollment-notice__text">
+            <strong>{{ pendingStudents.length }}</strong>
+            {{ pendingStudents.length === 1 ? 'student has' : 'students have' }}
+            requested enrollment in this subject.
+          </span>
+        </div>
+        <button type="button"
+                class="btn btn-sm btn-warning text-dark flex-shrink-0"
+                (click)="setActiveTab('pending')">
+          <i class="bi bi-hourglass-split me-1"></i>Review requests
+        </button>
+      </div>
+    </div>
+
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-4">
       <li class="nav-item">

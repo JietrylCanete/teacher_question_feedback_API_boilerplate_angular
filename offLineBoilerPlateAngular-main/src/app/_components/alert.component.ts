@@ -1,11 +1,15 @@
-﻿import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { Router, NavigationStart } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { Alert, AlertType } from '@app/_models';
 import { AlertService } from '@app/_services';
 
-@Component({ selector: 'alert', templateUrl: 'alert.component.html' })
+@Component({
+    selector: 'alert',
+    templateUrl: 'alert.component.html',
+    styleUrls: ['alert.component.css']
+})
 export class AlertComponent implements OnInit, OnDestroy {
     @Input() id = 'default-alert';
     @Input() fade = true;
@@ -74,7 +78,7 @@ export class AlertComponent implements OnInit, OnDestroy {
     cssClasses(alert: Alert) {
         if (!alert) return;
 
-        const classes = ['alert', 'alert-dismissible', 'mt-4', 'container'];
+        const classes = ['alert', 'alert-dismissible'];
 
         const alertTypeClass = {
             [AlertType.Success]: 'alert-success',

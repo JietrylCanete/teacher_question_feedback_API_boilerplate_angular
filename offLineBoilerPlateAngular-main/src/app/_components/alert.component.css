@@ -1,0 +1,19 @@
+/* Fixed toast stack — does not affect document flow / layout below */
+.global-alert-stack {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1060;
+  width: min(100% - 2rem, 36rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.global-alert-stack .alert {
+  pointer-events: auto;
+  margin-bottom: 0;
+  box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.12);
+}

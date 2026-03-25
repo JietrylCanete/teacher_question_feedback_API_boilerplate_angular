@@ -16,7 +16,8 @@ export class TakeQuizComponent implements OnInit {
   loading = true;
   submitting = false;
   submitted = false;
-  result: any = null;
+  /** Set after successful submit — students only see confirmation, not scores */
+  submissionComplete = false;
   errorMessage: string | null = null;
 
   constructor(
@@ -74,15 +75,15 @@ export class TakeQuizComponent implements OnInit {
     }
 
     this.submitting = true;
-    this.result = null;
+    this.submissionComplete = false;
     this.errorMessage = null;
     const payload = this.form.value.answers;
 
     this.quizService.submitQuizAnswers(this.quizId, payload)
       .pipe(first())
       .subscribe({
-        next: (res) => {
-          this.result = res;
+        next: () => {
+          this.submissionComplete = true;
           this.submitting = false;
           this.alertService.success('Quiz submitted', { keepAfterRouteChange: false });
         },

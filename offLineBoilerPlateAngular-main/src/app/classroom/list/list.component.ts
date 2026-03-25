@@ -35,7 +35,11 @@ export class ListComponent implements OnInit {
   }
 
   loadSubjects() {
-    this.subjectService.getAll()
+    const subjects$ = this.isStudent()
+      ? this.subjectService.getMySubjects()
+      : this.subjectService.getAll();
+
+    subjects$
       .pipe(first())
       .subscribe({
         next: (subjects: any[]) => {

@@ -394,8 +394,12 @@ async function getSubjectQuestions(subjectId, userId, userRole) {
         }
     }
 
+    // Standalone subject questions only — quiz items are linked via quizId and belong on the quiz UI
     const questions = await db.Question.findAll({
-        where: { subjectId },
+        where: {
+            subjectId,
+            quizId: { [Op.is]: null }
+        },
         include: [{
             model: db.Account,
             as: 'teacher',

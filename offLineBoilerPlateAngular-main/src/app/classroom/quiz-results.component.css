@@ -1,2 +1,67 @@
-/* Match view-answers layout */
+/* Match view-answers / subject-view back control */
 
+.view-answers-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
+
+/* Quiz header card (same family as view-answers) */
+.question-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.question-header {
+  padding: 1.5rem 1.5rem 0.5rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.question-header .badge {
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  font-weight: 500;
+}
+
+.question-content {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+.answers-section {
+  margin-top: 2rem;
+}
+
+.no-answers {
+  background: #f8f9fa;
+  border-radius: 16px;
+  padding: 3rem;
+}
+
+@media (max-width: 768px) {
+  .view-answers-container {
+    padding: 1rem;
+  }
+}

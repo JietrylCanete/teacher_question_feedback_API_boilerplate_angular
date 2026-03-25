@@ -106,65 +106,65 @@ async function createQuestion(questionText, teacherId, subjectId, dueDate, point
 }
 
 async function getQuestions(userId, userRole) {
-    const questions = await db.Question.findAll({ 
+    const isStudent = userRole === 'Student' || userRole === 'User';
+
+    const whereClause = {
+        quizId: { [Op.is]: null }
+    };
+
+    if (isStudent) {
+        const enrollments = await db.SubjectEnrollment.findAll({
+            where: { studentId: userId, status: 'active' },
+            attributes: ['subjectId']
+        });
+        const enrolledSubjectIds = enrollments.map(e => e.subjectId);
+        if (enrolledSubjectIds.length === 0) {
+            return [];
+        }
+        whereClause.subjectId = { [Op.in]: enrolledSubjectIds };
+    }
+
+    const questions = await db.Question.findAll({
+        where: whereClause,
         order: [['createdAt', 'DESC']],
-        include: [{
-            model: db.Account,
-            as: 'teacher',
-            attributes: ['firstName', 'lastName', 'email']
-        }]
+        include: [
+            {
+                model: db.Account,
+                as: 'teacher',
+                attributes: ['firstName', 'lastName', 'email']
+            },
+            {
+                model: db.Subject,
+                attributes: ['subjectId', 'subjectName', 'subjectCode']
+            }
+        ]
     });
-    
-    // If user is a student or regular user, check which questions they've answered
-    if (userRole === 'Student' || userRole === 'User') {
+
+    let answeredIds = [];
+    if (isStudent) {
         const answeredQuestions = await db.Answer.findAll({
             where: { studentId: userId },
             attributes: ['questionId']
         });
-        
-        const answeredIds = answeredQuestions.map(a => a.questionId);
-        
-        // Add hasAnswered flag, teacher name and parsed options to each question
-        return questions.map(q => {
-            const question = q.toJSON();
-            question.hasAnswered = answeredIds.includes(q.questionId);
-            
-            // Format teacher name
-            if (question.teacher) {
-                question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
-            } else {
-                // Fallback if teacher not found
-                question.teacherName = 'Unknown Teacher';
-            }
-            
-            // Parse options if present
-            if (question.options) {
-                try {
-                    question.options = JSON.parse(question.options);
-                } catch {
-                    // keep raw value if parsing fails
-                }
-            }
-
-            // Remove the teacher object to keep response clean
-            delete question.teacher;
-            
-            return question;
-        });
+        answeredIds = answeredQuestions.map(a => a.questionId);
     }
-    
-    // For teachers and admins, just return the questions with teacher info
+
     return questions.map(q => {
         const question = q.toJSON();
-        
-        // Format teacher name
+
+        if (question.Subject) {
+            question.subjectName = question.Subject.subjectName;
+            question.subjectCode = question.Subject.subjectCode;
+            delete question.Subject;
+        }
+
         if (question.teacher) {
             question.teacherName = `${question.teacher.firstName} ${question.teacher.lastName}`;
+            delete question.teacher;
         } else {
             question.teacherName = 'Unknown Teacher';
         }
-        
-        // Parse options if present
+
         if (question.options) {
             try {
                 question.options = JSON.parse(question.options);
@@ -173,9 +173,10 @@ async function getQuestions(userId, userRole) {
             }
         }
 
-        // Remove the teacher object to keep response clean
-        delete question.teacher;
-        
+        if (isStudent) {
+            question.hasAnswered = answeredIds.includes(question.questionId);
+        }
+
         return question;
     });
 }

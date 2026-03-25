@@ -1,2 +1,54 @@
-/* Styles for take quiz page */
+/* Layout + back control — match view-answers / subject-view / quiz-results */
 
+.take-quiz-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.back-link {
+  color: #6c757d;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-link:hover {
+  color: #0d6efd;
+  background: #e7f1ff;
+  transform: translateX(-5px);
+}
+
+.quiz-header {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.question-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.question-text {
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.error-messages {
+  color: #dc3545;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .take-quiz-container {
+    padding: 1rem;
+  }
+}
